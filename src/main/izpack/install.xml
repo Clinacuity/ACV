@@ -1,0 +1,55 @@
+<izpack:installation version="5.0"
+                     xmlns:izpack="http://izpack.org/schema/installation"
+                     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                     xsi:schemaLocation="http://izpack.org/schema/installation http://izpack.org/schema/5.0/izpack-installation-5.0.xsd">
+    <properties>
+        <property name="RES_ROOT" value="./"/>
+    </properties>
+
+    <locale>
+        <langpack iso3="eng"/>
+    </locale>
+
+    <info>
+        <appname>ETUDE Viewer</appname>
+        <appversion>1.0</appversion>
+        <authors>
+            <author name="Jean-Karlo Accetta" email="jkaccetta@clinacuity.com"/>
+            <author name="Paul Heider" email="heiderp@musc.com"/>
+            <author name="Stephan Meystre" email="smeystre@clinacuity.com"/>
+        </authors>
+        <javaversion strict="true">9.0</javaversion>
+        <!--<expiresdate>2016-06-29</expiresdate>-->
+    </info>
+
+    <guiprefs width="800" height="600" resizable="no">
+        <splash>@{RES_ROOT}/resources/logo.png</splash>
+    </guiprefs>
+
+    <resources>
+        <res id="InfoPanel.info" src="@{RES_ROOT}/about/info.txt"/>
+        <res id="LicencePanel.licence" src="@{RES_ROOT}/legal/license.txt"/>
+    </resources>
+
+    <panels>
+        <panel classname="TargetPanel"/>
+        <panel classname="PacksPanel"/>
+        <panel classname="InstallPanel"/>
+        <panel classname="FinishPanel"/>
+    </panels>
+
+    <packs>
+        <pack name="ETUDE Viewer" required="yes">
+            <description>This installs the ETUDE Viewer</description>
+            <fileset dir="@{staging.dir}" override="true"/>
+        </pack>
+    </packs>
+    <!--<packs>-->
+        <!--<pack name="Test Core" required="yes">-->
+            <!--<description>The core files needed for the application</description>-->
+            <!--<fileset dir="plain" targetdir="${INSTALL_PATH}" override="true"/>-->
+            <!--<parsable targetfile="${INSTALL_PATH}/test.properties"/>-->
+        <!--</pack>-->
+    <!--</packs>-->
+
+</izpack:installation>
