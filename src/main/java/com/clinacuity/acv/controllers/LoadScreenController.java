@@ -74,7 +74,6 @@ public class LoadScreenController implements Initializable {
 
             AcvContext.loadPage(NavBarController.NavBarPages.COMPARISON_VIEW);
         } else {
-            // TODO: deactivate the loading spinner
             logger.debug("loading spinner will deactivate on its own if the content is reloaded");
         }
     }
