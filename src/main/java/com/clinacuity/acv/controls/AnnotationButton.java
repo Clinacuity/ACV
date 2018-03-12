@@ -132,14 +132,12 @@ public class AnnotationButton extends Button {
     private void setMatchType(MatchType match) {
         switch(match) {
             case TRUE_POS:
-                // TODO
-//                if (attributesMatch) {
-//                }
                 matchTypeStyle = "-fx-background-color: DodgerBlue;";
                 break;
 
             case FALSE_POS:
-                matchTypeStyle = "-fx-background-color: DarkOrchid";
+                matchTypeStyle = "-fx-background-color: DarkOrchid;";
+                break;
 
             case FALSE_NEG:
                 matchTypeStyle = "-fx-background-color: OrangeRed;";
