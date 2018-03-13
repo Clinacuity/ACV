@@ -3,23 +3,31 @@
 }
 
 @font-face {
+    src: url('/fonts/open/OpenSans-SemiBold.ttf');
+}
+
+@font-face {
      src: url('/fonts/open/OpenSans-Bold.ttf');
 }
 
 @font-face {
-    src: url("/fonts/open/OpenSans-BoldItalic.ttf");
+    src: url('/fonts/open/OpenSans-BoldItalic.ttf');
 }
 
 @font-face {
-    src: url("/fonts/open/OpenSans-Italic.ttf");
+    src: url('/fonts/open/OpenSans-Italic.ttf');
 }
 
 @font-face {
-    src: url("/fonts/fira/FiraMono-Regular.ttf");
+    src: url('/fonts/fira/FiraMono-Regular.ttf');
 }
 
 @font-face {
-    src: url("/fonts/fira/FiraMono-Bold.ttf");
+    src: url('/fonts/fira/FiraMono-Bold.ttf');
+}
+
+@font-face {
+    src: url('/fonts/fira/FiraMono-Medium.ttf');
 }
 
 
@@ -135,8 +143,7 @@
 /*    MISC        */
 
 /*    BUTTONS     */
-.button* {
-    -fx-font-family: "Open Sans Light";
+.button {
     -fx-padding: 0.7em 0.57em;
     -fx-text-fill: Black;
     -fx-background-radius: 2px;
@@ -314,15 +321,14 @@
 }
 
 .table-view {
-    -fx-border-width: 1 0 1 0;
-    -fx-border-color: DimGray;
     -fx-background-color: rgb(235, 235, 235);
     -fx-table-cell-border-color: Transparent;
 }
 
-.column-header-text {
-    -fx-font-family: "Open Sans Regular";
-    -fx-font-size: 12px;
+.column-header-label {
+    -fx-font-size: 14px;
+    -fx-text-fill: DimGray;
+    -fx-font-family: "Open Sans SemiBold";
 }
 
 .table-view .column-header {
@@ -330,12 +336,10 @@
 }
 
 .table-view .column-header-background {
-    -fx-background-color: CornflowerBlue;
-}
-
-.table-view .column-header-background .label {
-    -fx-background-color: Transparent;
-    -fx-text-fill: Black;
+    -fx-font-family: "Fira Mono Regular";
+    -fx-border-width: 1 0 0 0;
+    -fx-border-color: rgb(0, 56, 145);
+    -fx-background-color: linear-gradient(to bottom, Gainsboro, rgb(151, 178, 215));
 }
 
 .table-row-cell {
