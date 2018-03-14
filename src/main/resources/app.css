@@ -147,6 +147,7 @@
     -fx-padding: 0.7em 0.57em;
     -fx-text-fill: Black;
     -fx-background-radius: 2px;
+    -fx-font-family: "Open Sans Light";
 }
 
 .button-clear {
