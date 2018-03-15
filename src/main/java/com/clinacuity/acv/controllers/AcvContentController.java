@@ -31,6 +31,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.ResourceBundle;
+import static com.clinacuity.acv.controllers.ConfigurationBuilderController.CorpusType;
 
 public class AcvContentController implements Initializable {
     private static final Logger logger = LogManager.getLogger();
@@ -48,8 +49,9 @@ public class AcvContentController implements Initializable {
     private ObjectProperty<AnnotationButton> selectedAnnotationButton = new SimpleObjectProperty<>();
     private CreateLabelsFromDocumentTask referenceLabelsTask;
     private CreateLabelsFromDocumentTask targetLabelsTask;
-    private CreateButtonsTask targetButtonsTask;
-    private CreateButtonsTask referenceButtonsTask;
+    private CreateButtonsTask createButtonsTask;
+
+    // TODO: no ticket but we should get rid of this var
     private int documentsLoaded = 0;
 
     @Override
@@ -122,6 +124,7 @@ public class AcvContentController implements Initializable {
         context.falsePositivesProperty.addListener((obs, old, newValue) -> updateButtons(newValue, MatchType.FALSE_POS, targetPane));
         context.falseNegativesProperty.addListener((obs, old, newValue) -> updateButtons(newValue, MatchType.FALSE_NEG, referencePane));
 
+        // TODO: DEV-173 previous and next should use the master (sorted) list
         viewControls.getPreviousButton().setOnAction(event -> {
             AnnotationButton currentButton = selectedAnnotationButton.getValue();
             if (currentButton != null) {
@@ -252,75 +255,60 @@ public class AcvContentController implements Initializable {
         List<JsonObject> targetJson = targetAnnotations.getAnnotationsByKey(key);
         List<JsonObject> referenceJson = referenceAnnotations.getAnnotationsByKey(key);
 
-        targetButtonsTask = new CreateButtonsTask(targetJson, targetPane.getLabelList());
-        targetButtonsTask.setOnSucceeded(event -> {
-            targetPane.addButtons(targetButtonsTask.getValue());
+        createButtonsTask = new CreateButtonsTask(targetJson, targetPane.getLabelList(), referenceJson, referencePane.getLabelList());
+        createButtonsTask.setOnSucceeded(event -> {
+            targetPane.addButtons(createButtonsTask.getValue().get(CorpusType.SYSTEM));
+            referencePane.addButtons(createButtonsTask.getValue().get(CorpusType.REFERENCE));
             setupAnnotationButtons();
         });
-        targetButtonsTask.setOnFailed(event -> {
-            logger.throwing(targetButtonsTask.getException());
+        createButtonsTask.setOnFailed(event -> {
+            logger.throwing(createButtonsTask.getException());
             targetPane.addButtons(new ArrayList<>());
             setupAnnotationButtons();
         });
-        new Thread(targetButtonsTask).start();
-
-        referenceButtonsTask = new CreateButtonsTask(referenceJson, referencePane.getLabelList());
-        referenceButtonsTask.setOnSucceeded(event -> {
-            referencePane.addButtons(referenceButtonsTask.getValue());
-            setupAnnotationButtons();
-        });
-        referenceButtonsTask.setOnFailed(event -> {
-            logger.throwing(referenceButtonsTask.getException());
-            referencePane.addButtons(new ArrayList<>());
-            setupAnnotationButtons();
-        });
-        new Thread(referenceButtonsTask).start();
+        new Thread(createButtonsTask).start();
     }
 
     synchronized private void setupAnnotationButtons() {
-        documentsLoaded++;
-        if (documentsLoaded >= 2) {
-            documentsLoaded = 0;
-            List<AnnotationButton> targetButtons = targetPane.getAnnotationButtonList();
-            List<AnnotationButton> refButtons = referencePane.getAnnotationButtonList();
+        List<AnnotationButton> targetButtons = targetPane.getAnnotationButtonList();
+        List<AnnotationButton> refButtons = referencePane.getAnnotationButtonList();
 
-            // Link the buttons
-            for (AnnotationButton targetButton: targetButtons) {
-                for(AnnotationButton refButton: refButtons) {
-                    int beginTarget = targetButton.getBegin();
-                    int endTarget = targetButton.getEnd();
-                    int beginRef = refButton.getBegin();
-                    int endRef = refButton.getEnd();
+        // Link the buttons
+        for (AnnotationButton targetButton: targetButtons) {
+            for(AnnotationButton refButton: refButtons) {
+                int beginTarget = targetButton.getBegin();
+                int endTarget = targetButton.getEnd();
+                int beginRef = refButton.getBegin();
+                int endRef = refButton.getEnd();
 
-                    if (beginTarget == beginRef && endTarget == endRef) {
-                        targetButton.matchingButtons.add(refButton);
-                        refButton.matchingButtons.add(targetButton);
-                    }
+                if (beginTarget == beginRef && endTarget == endRef) {
+                    targetButton.matchingButtons.add(refButton);
+                    refButton.matchingButtons.add(targetButton);
                 }
-
-                targetButton.targetTextArea = targetPane.getFeatureTreeText();
-                targetButton.parent = targetPane.getAnchor();
-                targetButton.setOnMouseClicked(event -> selectedAnnotationButton.setValue(targetButton));
             }
 
-            for (AnnotationButton refButton: refButtons) {
-                refButton.parent = referencePane.getAnchor();
-                refButton.targetTextArea = referencePane.getFeatureTreeText();
-                refButton.setOnMouseClicked(event -> selectedAnnotationButton.setValue(refButton));
-            }
+            targetButton.targetTextArea = targetPane.getFeatureTreeText();
+            targetButton.parent = targetPane.getAnchor();
+            targetButton.setOnMouseClicked(event -> selectedAnnotationButton.setValue(targetButton));
+            targetButton.checkMatchTypes(MatchType.FALSE_POS);
+        }
+
+        for (AnnotationButton refButton: refButtons) {
+            refButton.parent = referencePane.getAnchor();
+            refButton.targetTextArea = referencePane.getFeatureTreeText();
+            refButton.setOnMouseClicked(event -> selectedAnnotationButton.setValue(refButton));
+            refButton.checkMatchTypes(MatchType.FALSE_NEG);
+        }
 
             /*
             * This could be faster by using either of the loops above; but for the sake of separating the logic,
             * we will use a separate for-loop.  The cost to performance is O(n).  This loop determines
             * which color to assign the buttons based on the type of match.
             */
-            targetButtons.forEach(button -> button.checkMatchTypes(MatchType.FALSE_POS));
-            refButtons.forEach(button -> button.checkMatchTypes(MatchType.FALSE_NEG));
+        targetButtons.forEach(button -> button.checkMatchTypes(MatchType.FALSE_POS));
+        refButtons.forEach(button -> button.checkMatchTypes(MatchType.FALSE_NEG));
 
-            removeUncheckedAnnotations();
-        } else {
-            logger.debug("One of the tasks is not done yet, waiting...");
-        }
+        removeUncheckedAnnotations();
     }
 
     private void removeUncheckedAnnotations() {
@@ -358,12 +346,8 @@ public class AcvContentController implements Initializable {
             referenceLabelsTask.cancel();
         }
 
-        if (targetButtonsTask != null && targetButtonsTask.isRunning()) {
-            targetButtonsTask.cancel();
-        }
-
-        if (referenceButtonsTask != null && referenceButtonsTask.isRunning()) {
-            referenceButtonsTask.cancel();
+        if (createButtonsTask != null && createButtonsTask.isRunning()) {
+            createButtonsTask.cancel();
         }
     }
 
