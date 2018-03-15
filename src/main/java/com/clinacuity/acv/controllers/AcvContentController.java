@@ -124,17 +124,6 @@ public class AcvContentController implements Initializable {
         context.falsePositivesProperty.addListener((obs, old, newValue) -> updateButtons(newValue, MatchType.FALSE_POS, targetPane));
         context.falseNegativesProperty.addListener((obs, old, newValue) -> updateButtons(newValue, MatchType.FALSE_NEG, referencePane));
 
-        // TODO: DEV-173 previous and next should use the master (sorted) list
-        viewControls.getPreviousButton().setOnAction(event -> {
-            AnnotationButton currentButton = selectedAnnotationButton.getValue();
-            if (currentButton != null) {
-                if (currentButton.previousButton != null) {
-                    selectedAnnotationButton.setValue(currentButton.previousButton);
-                } else {
-                    logger.debug("Current Annotation Button does not have a Previous value.");
-                }
-            }
-        });
         viewControls.getNextButton().setOnAction(event -> {
             AnnotationButton currentButton = selectedAnnotationButton.getValue();
             if (currentButton != null) {
@@ -143,8 +132,61 @@ public class AcvContentController implements Initializable {
                 } else {
                     logger.debug("Current Annotation Button does not have a Next value.");
                 }
+            } else {
+                if (!targetPane.getAnnotationButtonList().isEmpty()) {
+                    if (!referencePane.getAnnotationButtonList().isEmpty()) {
+                        if (targetPane.getAnnotationButtonList().get(0).getBegin() > referencePane.getAnnotationButtonList().get(0).getBegin()) {
+                            selectedAnnotationButton.setValue(referencePane.getAnnotationButtonList().get(0));
+                        } else {
+                            selectedAnnotationButton.setValue(targetPane.getAnnotationButtonList().get(0));
+                        }
+                    } else {
+                        selectedAnnotationButton.setValue(targetPane.getAnnotationButtonList().get(0));
+                    }
+                } else {
+                    if (!referencePane.getAnnotationButtonList().isEmpty()) {
+                        selectedAnnotationButton.setValue(referencePane.getAnnotationButtonList().get(0));
+                    } else {
+                        logger.warn("There are no buttons here! If there's a table row selected, this shouldn't occur...");
+                    }
+                }
             }
         });
+
+        viewControls.getPreviousButton().setOnAction(event -> {
+            AnnotationButton currentButton = selectedAnnotationButton.getValue();
+            if (currentButton != null) {
+                if (currentButton.previousButton != null) {
+                    selectedAnnotationButton.setValue(currentButton.previousButton);
+                } else {
+                    logger.debug("Current Annotation Button does not have a Previous value.");
+                }
+            } else {
+                if (!targetPane.getAnnotationButtonList().isEmpty()) {
+                    if (!referencePane.getAnnotationButtonList().isEmpty()) {
+                        if (targetPane.getAnnotationButtonList().get(targetPane.getAnnotationButtonList().size() - 1).getBegin()
+                                < referencePane.getAnnotationButtonList().get(referencePane.getAnnotationButtonList().size() - 1).getBegin()) {
+                            selectedAnnotationButton.setValue(referencePane
+                                    .getAnnotationButtonList().get(referencePane.getAnnotationButtonList().size() - 1));
+                        } else {
+                            selectedAnnotationButton.setValue(targetPane
+                                    .getAnnotationButtonList().get(targetPane.getAnnotationButtonList().size() - 1));
+                        }
+                    } else {
+                        selectedAnnotationButton.setValue(targetPane
+                                .getAnnotationButtonList().get(targetPane.getAnnotationButtonList().size() - 1));
+                    }
+                } else {
+                    if (!referencePane.getAnnotationButtonList().isEmpty()) {
+                        selectedAnnotationButton.setValue(referencePane
+                                .getAnnotationButtonList().get(referencePane.getAnnotationButtonList().size() - 1));
+                    } else {
+                        logger.warn("There are no buttons here! If there's a table row selected, this shouldn't occur...");
+                    }
+                }
+            }
+        });
+
         viewControls.getClearButton().setOnAction(event -> selectedAnnotationButton.setValue(null));
     }
 
