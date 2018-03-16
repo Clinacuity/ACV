@@ -153,19 +153,6 @@ public class AnnotationButton extends Button implements Comparable<AnnotationBut
         setStyle(matchTypeStyle);
     }
 
-    // TODO: DEV-172
-    public boolean exactMatch(int begin, int end) {
-        return true;
-    }
-
-    public boolean partialMatch(int being, int end) {
-        return true;
-    }
-
-    public boolean fullyContained(int begin, int end) {
-        return true;
-    }
-
     /**
      * Compares this object with the specified object for order.  Returns a
      * negative integer, zero, or a positive integer as this object is less

@@ -312,27 +312,20 @@ public class AcvContentController implements Initializable {
     }
 
     synchronized private void setupAnnotationButtons() {
-        List<AnnotationButton> targetButtons = targetPane.getAnnotationButtonList();
+        List<AnnotationButton> sysOutButtons = targetPane.getAnnotationButtonList();
         List<AnnotationButton> refButtons = referencePane.getAnnotationButtonList();
 
         // Link the buttons
-        for (AnnotationButton targetButton: targetButtons) {
+        String matchType = AcvContext.getInstance().selectedMatchTypeProperty.getValueSafe().toLowerCase();
+        for (AnnotationButton sysOutButton : sysOutButtons) {
             for(AnnotationButton refButton: refButtons) {
-                int beginTarget = targetButton.getBegin();
-                int endTarget = targetButton.getEnd();
-                int beginRef = refButton.getBegin();
-                int endRef = refButton.getEnd();
-
-                if (beginTarget == beginRef && endTarget == endRef) {
-                    targetButton.matchingButtons.add(refButton);
-                    refButton.matchingButtons.add(targetButton);
-                }
+                matchButtons(sysOutButton, refButton, matchType);
             }
 
-            targetButton.targetTextArea = targetPane.getFeatureTreeText();
-            targetButton.parent = targetPane.getAnchor();
-            targetButton.setOnMouseClicked(event -> selectedAnnotationButton.setValue(targetButton));
-            targetButton.checkMatchTypes(MatchType.FALSE_POS);
+            sysOutButton.targetTextArea = targetPane.getFeatureTreeText();
+            sysOutButton.parent = targetPane.getAnchor();
+            sysOutButton.setOnMouseClicked(event -> selectedAnnotationButton.setValue(sysOutButton));
+            sysOutButton.checkMatchTypes(MatchType.FALSE_POS);
         }
 
         for (AnnotationButton refButton: refButtons) {
@@ -347,10 +340,47 @@ public class AcvContentController implements Initializable {
             * we will use a separate for-loop.  The cost to performance is O(n).  This loop determines
             * which color to assign the buttons based on the type of match.
             */
-        targetButtons.forEach(button -> button.checkMatchTypes(MatchType.FALSE_POS));
+        sysOutButtons.forEach(button -> button.checkMatchTypes(MatchType.FALSE_POS));
         refButtons.forEach(button -> button.checkMatchTypes(MatchType.FALSE_NEG));
 
         removeUncheckedAnnotations();
+    }
+
+    private void matchButtons(AnnotationButton systemOutButton, AnnotationButton refButton, String matchType) {
+        int beginSysOut = systemOutButton.getBegin();
+        int endSysOut = systemOutButton.getEnd();
+        int beginRef = refButton.getBegin();
+        int endRef = refButton.getEnd();
+
+        if (beginSysOut == beginRef && endSysOut == endRef) {
+            systemOutButton.matchingButtons.add(refButton);
+            refButton.matchingButtons.add(systemOutButton);
+        }
+
+        switch (matchType) {
+            case "partial":
+                /*
+                 * Partial overlap:
+                 * |------|     |---------|  |---|
+                 *     |----------|  |--------|
+                 */
+                if ((beginSysOut > beginRef && beginSysOut < endRef) || beginRef > beginSysOut && beginRef < endSysOut) {
+                    systemOutButton.matchingButtons.add(refButton);
+                    refButton.matchingButtons.add(systemOutButton);
+                }
+                break;
+            case "fully-contained":
+                /*
+                 * Fully contained only considers when system contains reference
+                 * |----------|  |------|
+                 *   |--------|    |--|
+                 */
+                if (beginRef >= beginSysOut && endRef <= endSysOut) {
+                    systemOutButton.matchingButtons.add(refButton);
+                    refButton.matchingButtons.add(systemOutButton);
+                }
+                break;
+        }
     }
 
     private void removeUncheckedAnnotations() {
