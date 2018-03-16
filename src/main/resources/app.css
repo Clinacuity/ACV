@@ -357,6 +357,7 @@
     -fx-table-cell-border-color: Transparent;
     -fx-background-color: DimGray;
     -fx-font-family: "Open Sans Light";
+    -fx-text-fill: Gainsboro;
 }
 
 .column-center-align {
