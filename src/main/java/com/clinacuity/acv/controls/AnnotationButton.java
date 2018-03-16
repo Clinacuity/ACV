@@ -28,7 +28,7 @@ public class AnnotationButton extends Button implements Comparable<AnnotationBut
 
     public List<AnnotationButton> matchingButtons = new ArrayList<>();
     public List<AnnotationButton> sameAnnotationButtons = new ArrayList<>();
-    public TextArea targetTextArea;
+    public TextArea textArea;
     public AnchorPane parent;
     public MatchType getMatchType() { return matchType; }
 
@@ -201,7 +201,7 @@ public class AnnotationButton extends Button implements Comparable<AnnotationBut
      *                              *
      *******************************/
 
-    private EventHandler<ActionEvent> onButtonAction = event -> targetTextArea.setText(getAnnotationFeatureTree());
+    private EventHandler<ActionEvent> onButtonAction = event -> textArea.setText(getAnnotationFeatureTree());
 
     private EventHandler<MouseEvent> setHover = event -> {
         matchingButtons.forEach(button -> button.setHover(true));
