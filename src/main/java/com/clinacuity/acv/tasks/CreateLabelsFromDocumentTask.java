@@ -24,7 +24,7 @@ public class CreateLabelsFromDocumentTask extends Task<List<LineNumberedLabel>> 
     @Override public List<LineNumberedLabel> call() {
         List<LineNumberedLabel> labelList = new ArrayList<>();
 
-        // TODO: improve the line-wrapping to break on spaces
+        // TODO: DEV-24; improve the line-wrapping to break on spaces
         int maxChars = AnnotatedDocumentPane.getMaxCharactersPerLabel();
         double offset = 0.0d;
         double offsetIncrement = AnnotatedDocumentPane.getCharacterHeight() * 2.0d;
@@ -36,7 +36,7 @@ public class CreateLabelsFromDocumentTask extends Task<List<LineNumberedLabel>> 
         for (int i = 0; i < lines.length; i++) {
             String line = lines[i];
 
-            // TODO: always true; needs DEV-24 and a UI checkbox bound to this toggle
+            // TODO: DEV-24; UI checkbox bound to this toggle
 //            boolean softWrapEnabled = true;
 //            if (softWrapEnabled) {
 //                // code-block from below

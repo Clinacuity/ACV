@@ -21,31 +21,37 @@ import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
+import javafx.scene.control.Label;
 import javafx.scene.layout.VBox;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.reactfx.util.FxTimer;
 import java.net.URL;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.ResourceBundle;
+import static com.clinacuity.acv.controllers.ConfigurationBuilderController.CorpusType;
 
 public class AcvContentController implements Initializable {
     private static final Logger logger = LogManager.getLogger();
     private AcvContext context;
 
     @FXML private AnnotatedDocumentPane referencePane;
-    @FXML private AnnotatedDocumentPane targetPane;
+    @FXML private AnnotatedDocumentPane systemOutPane;
     @FXML private ViewControls viewControls;
     @FXML private JFXDrawer drawer;
     @FXML private SideBar sideBar;
-    private Annotations targetAnnotations;
+    @FXML private Label systemFile;
+    @FXML private Label referenceFile;
+    private Annotations systemOutAnnotations;
     private Annotations referenceAnnotations;
     private ObjectProperty<AnnotationButton> selectedAnnotationButton = new SimpleObjectProperty<>();
     private CreateLabelsFromDocumentTask referenceLabelsTask;
-    private CreateLabelsFromDocumentTask targetLabelsTask;
-    private CreateButtonsTask targetButtonsTask;
-    private CreateButtonsTask referenceButtonsTask;
+    private CreateLabelsFromDocumentTask systemOutLabelsTask;
+    private CreateButtonsTask createButtonsTask;
+
+    // TODO: no ticket but we should get rid of this var
     private int documentsLoaded = 0;
 
     @Override
@@ -72,18 +78,22 @@ public class AcvContentController implements Initializable {
         sideBar.setDrawer(drawer);
         drawer.setDefaultDrawerSize(SideBar.MIN_WIDTH);
 
-        sideBar.selectedTargetDocumentProperty().addListener((obs, old, newValue) -> {
-            targetAnnotations = new Annotations(newValue);
+        sideBar.selectedSystemOutDocumentProperty().addListener((obs, old, newValue) -> {
+            String[] paths = newValue.split("/");
+            systemFile.setText(paths[paths.length - 1]);
+            systemOutAnnotations = new Annotations(newValue);
             resetPanes();
         });
 
         sideBar.selectedReferenceDocumentProperty().addListener((obs, old, newValue) -> {
+            String[] paths = newValue.split("/");
+            referenceFile.setText(paths[paths.length - 1]);
             referenceAnnotations = new Annotations(newValue);
             resetPanes();
         });
 
         CreateSidebarItemsTask sidebarTask = new CreateSidebarItemsTask();
-        sidebarTask.setCorpusDictionary(AcvContext.getInstance().getCorpusDictionary());
+        sidebarTask.setCorpusDictionary(context.getCorpusDictionary());
         sidebarTask.setOnSucceeded(event -> {
             List<VBox> results = sidebarTask.getValue();
 
@@ -102,17 +112,46 @@ public class AcvContentController implements Initializable {
      * Sets up the children AnnotatedDocumentPanes by calling their initialize method. It also binds their scrollbars
      */
     private void initDocumentPanes() {
-        referencePane.getScrollPane().vvalueProperty().bindBidirectional(targetPane.getScrollPane().vvalueProperty());
-        referencePane.getScrollPane().hvalueProperty().bindBidirectional(targetPane.getScrollPane().hvalueProperty());
+        referencePane.getScrollPane().vvalueProperty().bindBidirectional(systemOutPane.getScrollPane().vvalueProperty());
+        referencePane.getScrollPane().hvalueProperty().bindBidirectional(systemOutPane.getScrollPane().hvalueProperty());
     }
 
     private void initViewControls() {
         context.truePositivesProperty.addListener((obs, old, newValue) -> {
-            updateButtons(newValue, MatchType.TRUE_POS, targetPane);
+            updateButtons(newValue, MatchType.TRUE_POS, systemOutPane);
             updateButtons(newValue, MatchType.TRUE_POS, referencePane);
         });
-        context.falsePositivesProperty.addListener((obs, old, newValue) -> updateButtons(newValue, MatchType.FALSE_POS, targetPane));
+        context.falsePositivesProperty.addListener((obs, old, newValue) -> updateButtons(newValue, MatchType.FALSE_POS, systemOutPane));
         context.falseNegativesProperty.addListener((obs, old, newValue) -> updateButtons(newValue, MatchType.FALSE_NEG, referencePane));
+
+        viewControls.getNextButton().setOnAction(event -> {
+            AnnotationButton currentButton = selectedAnnotationButton.getValue();
+            if (currentButton != null) {
+                if (currentButton.nextButton != null) {
+                    selectedAnnotationButton.setValue(currentButton.nextButton);
+                } else {
+                    logger.debug("Current Annotation Button does not have a Next value.");
+                }
+            } else {
+                if (!systemOutPane.getAnnotationButtonList().isEmpty()) {
+                    if (!referencePane.getAnnotationButtonList().isEmpty()) {
+                        if (systemOutPane.getAnnotationButtonList().get(0).getBegin() > referencePane.getAnnotationButtonList().get(0).getBegin()) {
+                            selectedAnnotationButton.setValue(referencePane.getAnnotationButtonList().get(0));
+                        } else {
+                            selectedAnnotationButton.setValue(systemOutPane.getAnnotationButtonList().get(0));
+                        }
+                    } else {
+                        selectedAnnotationButton.setValue(systemOutPane.getAnnotationButtonList().get(0));
+                    }
+                } else {
+                    if (!referencePane.getAnnotationButtonList().isEmpty()) {
+                        selectedAnnotationButton.setValue(referencePane.getAnnotationButtonList().get(0));
+                    } else {
+                        logger.warn("There are no buttons here! If there's a table row selected, this shouldn't occur...");
+                    }
+                }
+            }
+        });
 
         viewControls.getPreviousButton().setOnAction(event -> {
             AnnotationButton currentButton = selectedAnnotationButton.getValue();
@@ -122,18 +161,32 @@ public class AcvContentController implements Initializable {
                 } else {
                     logger.debug("Current Annotation Button does not have a Previous value.");
                 }
-            }
-        });
-        viewControls.getNextButton().setOnAction(event -> {
-            AnnotationButton currentButton = selectedAnnotationButton.getValue();
-            if (currentButton != null) {
-                if (currentButton.nextButton != null) {
-                    selectedAnnotationButton.setValue(currentButton.nextButton);
+            } else {
+                if (!systemOutPane.getAnnotationButtonList().isEmpty()) {
+                    if (!referencePane.getAnnotationButtonList().isEmpty()) {
+                        if (systemOutPane.getAnnotationButtonList().get(systemOutPane.getAnnotationButtonList().size() - 1).getBegin()
+                                < referencePane.getAnnotationButtonList().get(referencePane.getAnnotationButtonList().size() - 1).getBegin()) {
+                            selectedAnnotationButton.setValue(referencePane
+                                    .getAnnotationButtonList().get(referencePane.getAnnotationButtonList().size() - 1));
+                        } else {
+                            selectedAnnotationButton.setValue(systemOutPane
+                                    .getAnnotationButtonList().get(systemOutPane.getAnnotationButtonList().size() - 1));
+                        }
+                    } else {
+                        selectedAnnotationButton.setValue(systemOutPane
+                                .getAnnotationButtonList().get(systemOutPane.getAnnotationButtonList().size() - 1));
+                    }
                 } else {
-                    logger.debug("Current Annotation Button does not have a Next value.");
+                    if (!referencePane.getAnnotationButtonList().isEmpty()) {
+                        selectedAnnotationButton.setValue(referencePane
+                                .getAnnotationButtonList().get(referencePane.getAnnotationButtonList().size() - 1));
+                    } else {
+                        logger.warn("There are no buttons here! If there's a table row selected, this shouldn't occur...");
+                    }
                 }
             }
         });
+
         viewControls.getClearButton().setOnAction(event -> selectedAnnotationButton.setValue(null));
     }
 
@@ -150,7 +203,7 @@ public class AcvContentController implements Initializable {
             List<String> list = FXCollections.observableList(context.annotationList);
             list.clear();
 
-            targetAnnotations.getAnnotationKeySet().forEach(key -> {
+            systemOutAnnotations.getAnnotationKeySet().forEach(key -> {
                 if (!list.contains(key)) {
                     list.add(key);
                 }
@@ -170,17 +223,17 @@ public class AcvContentController implements Initializable {
             });
             new Thread(referenceLabelsTask).start();
 
-            targetLabelsTask = new CreateLabelsFromDocumentTask(targetAnnotations.getRawText());
-            targetLabelsTask.setOnSucceeded(event -> {
-                targetPane.addLineNumberedLabels(targetLabelsTask.getValue());
+            systemOutLabelsTask = new CreateLabelsFromDocumentTask(systemOutAnnotations.getRawText());
+            systemOutLabelsTask.setOnSucceeded(event -> {
+                systemOutPane.addLineNumberedLabels(systemOutLabelsTask.getValue());
                 resetViewControls();
             });
-            new Thread(targetLabelsTask).start();
+            new Thread(systemOutLabelsTask).start();
         }
     }
 
     private void populateMatchTypes() {
-        List<String> matchTypes = targetAnnotations.getMatchTypes();
+        List<String> matchTypes = systemOutAnnotations.getMatchTypes();
         viewControls.setMatchTypeToggleButtons(matchTypes);
 
         if (matchTypes.size() > 0) {
@@ -226,7 +279,7 @@ public class AcvContentController implements Initializable {
         ObservableList<AnnotationType> types = FXCollections.observableArrayList();
 
         context.annotationList.forEach(annotationKey -> {
-            Annotations annotation = targetAnnotations;
+            Annotations annotation = systemOutAnnotations;
             MetricValues values = annotation.getMetricValues(annotationKey);
 
             double tp = values.getTruePositive();
@@ -241,78 +294,97 @@ public class AcvContentController implements Initializable {
     }
 
     private void resetAnnotationButtons(String key) {
-        List<JsonObject> targetJson = targetAnnotations.getAnnotationsByKey(key);
+        List<JsonObject> systemOutJson = systemOutAnnotations.getAnnotationsByKey(key);
         List<JsonObject> referenceJson = referenceAnnotations.getAnnotationsByKey(key);
 
-        targetButtonsTask = new CreateButtonsTask(targetJson, targetPane.getLabelList());
-        targetButtonsTask.setOnSucceeded(event -> {
-            if (targetButtonsTask.getValue() != null) {
-                targetPane.addButtons(targetButtonsTask.getValue());
-                setupAnnotationButtons();
-            }
+        createButtonsTask = new CreateButtonsTask(systemOutJson, systemOutPane.getLabelList(), referenceJson, referencePane.getLabelList());
+        createButtonsTask.setOnSucceeded(event -> {
+            systemOutPane.addButtons(createButtonsTask.getValue().get(CorpusType.SYSTEM));
+            referencePane.addButtons(createButtonsTask.getValue().get(CorpusType.REFERENCE));
+            setupAnnotationButtons();
         });
-        new Thread(targetButtonsTask).start();
-
-        referenceButtonsTask = new CreateButtonsTask(referenceJson, referencePane.getLabelList());
-        referenceButtonsTask.setOnSucceeded(event -> {
-            if (referenceButtonsTask.getValue() != null) {
-                referencePane.addButtons(referenceButtonsTask.getValue());
-                setupAnnotationButtons();
-            }
+        createButtonsTask.setOnFailed(event -> {
+            logger.throwing(createButtonsTask.getException());
+            systemOutPane.addButtons(new ArrayList<>());
+            setupAnnotationButtons();
         });
-        new Thread(referenceButtonsTask).start();
+        new Thread(createButtonsTask).start();
     }
 
     synchronized private void setupAnnotationButtons() {
-        documentsLoaded++;
-        if (documentsLoaded >= 2) {
-            documentsLoaded = 0;
-            List<AnnotationButton> targetButtons = targetPane.getAnnotationButtonList();
-            List<AnnotationButton> refButtons = referencePane.getAnnotationButtonList();
+        List<AnnotationButton> sysOutButtons = systemOutPane.getAnnotationButtonList();
+        List<AnnotationButton> refButtons = referencePane.getAnnotationButtonList();
 
-            // Link the buttons
-            for (AnnotationButton targetButton: targetButtons) {
-                for(AnnotationButton refButton: refButtons) {
-                    int beginTarget = targetButton.getBegin();
-                    int endTarget = targetButton.getEnd();
-                    int beginRef = refButton.getBegin();
-                    int endRef = refButton.getEnd();
-
-                    if (beginTarget == beginRef && endTarget == endRef) {
-                        targetButton.matchingButtons.add(refButton);
-                        refButton.matchingButtons.add(targetButton);
-                    }
-
-                    targetButton.targetTextArea = targetPane.getFeatureTreeText();
-                }
-
-                targetButton.parent = targetPane.getAnchor();
-                //targetButton.targetTextArea = targetPane.getFeatureTreeText();
-                targetButton.setOnMouseClicked(event -> selectedAnnotationButton.setValue(targetButton));
+        // Link the buttons
+        String matchType = AcvContext.getInstance().selectedMatchTypeProperty.getValueSafe().toLowerCase();
+        for (AnnotationButton sysOutButton : sysOutButtons) {
+            for(AnnotationButton refButton: refButtons) {
+                matchButtons(sysOutButton, refButton, matchType);
             }
 
-            for (AnnotationButton refButton: refButtons) {
-                refButton.parent = referencePane.getAnchor();
-                refButton.targetTextArea = referencePane.getFeatureTreeText();
-                refButton.setOnMouseClicked(event -> selectedAnnotationButton.setValue(refButton));
-            }
+            sysOutButton.textArea = systemOutPane.getFeatureTreeText();
+            sysOutButton.parent = systemOutPane.getAnchor();
+            sysOutButton.setOnMouseClicked(event -> selectedAnnotationButton.setValue(sysOutButton));
+            sysOutButton.checkMatchTypes(MatchType.FALSE_POS);
+        }
+
+        for (AnnotationButton refButton: refButtons) {
+            refButton.parent = referencePane.getAnchor();
+            refButton.textArea = referencePane.getFeatureTreeText();
+            refButton.setOnMouseClicked(event -> selectedAnnotationButton.setValue(refButton));
+            refButton.checkMatchTypes(MatchType.FALSE_NEG);
+        }
 
             /*
             * This could be faster by using either of the loops above; but for the sake of separating the logic,
             * we will use a separate for-loop.  The cost to performance is O(n).  This loop determines
             * which color to assign the buttons based on the type of match.
             */
-            targetButtons.forEach(button -> button.checkMatchTypes(MatchType.FALSE_POS));
-            refButtons.forEach(button -> button.checkMatchTypes(MatchType.FALSE_NEG));
+        sysOutButtons.forEach(button -> button.checkMatchTypes(MatchType.FALSE_POS));
+        refButtons.forEach(button -> button.checkMatchTypes(MatchType.FALSE_NEG));
 
-            removeUncheckedAnnotations();
-        } else {
-            logger.debug("One of the tasks is not done yet, waiting...");
+        removeUncheckedAnnotations();
+    }
+
+    private void matchButtons(AnnotationButton systemOutButton, AnnotationButton refButton, String matchType) {
+        int beginSysOut = systemOutButton.getBegin();
+        int endSysOut = systemOutButton.getEnd();
+        int beginRef = refButton.getBegin();
+        int endRef = refButton.getEnd();
+
+        switch (matchType) {
+            case "partial":
+                /*
+                 * Partial overlap:
+                 * |------|     |---------|  |---|
+                 *     |----------|  |--------|
+                 */
+                if ((beginSysOut > beginRef && beginSysOut < endRef) || beginRef > beginSysOut && beginRef < endSysOut) {
+                    systemOutButton.matchingButtons.add(refButton);
+                    refButton.matchingButtons.add(systemOutButton);
+                }
+                break;
+            case "fully-contained":
+                /*
+                 * Fully contained only considers when system contains reference
+                 * |----------|  |------|
+                 *   |--------|    |--|
+                 */
+                if (beginRef > beginSysOut && endRef <= endSysOut || beginRef >= beginSysOut && endRef < endSysOut) {
+                    systemOutButton.matchingButtons.add(refButton);
+                    refButton.matchingButtons.add(systemOutButton);
+                }
+                break;
+        }
+        
+        if (beginSysOut == beginRef && endSysOut == endRef) {
+            systemOutButton.matchingButtons.add(refButton);
+            refButton.matchingButtons.add(systemOutButton);
         }
     }
 
     private void removeUncheckedAnnotations() {
-        targetPane.getAnnotationButtonList().forEach(button -> {
+        systemOutPane.getAnnotationButtonList().forEach(button -> {
             if (!isMatchTypeChecked(button.getMatchType())) {
                 button.removeFromParent();
             }
@@ -338,25 +410,21 @@ public class AcvContentController implements Initializable {
     }
 
     private void cancelEvents() {
-        if (targetLabelsTask != null && targetLabelsTask.isRunning()) {
-            targetLabelsTask.cancel();
+        if (systemOutLabelsTask != null && systemOutLabelsTask.isRunning()) {
+            systemOutLabelsTask.cancel();
         }
 
         if (referenceLabelsTask != null && referenceLabelsTask.isRunning()) {
             referenceLabelsTask.cancel();
         }
 
-        if (targetButtonsTask != null && targetButtonsTask.isRunning()) {
-            targetButtonsTask.cancel();
-        }
-
-        if (referenceButtonsTask != null && referenceButtonsTask.isRunning()) {
-            referenceButtonsTask.cancel();
+        if (createButtonsTask != null && createButtonsTask.isRunning()) {
+            createButtonsTask.cancel();
         }
     }
 
     private void clearPanes() {
-        targetPane.reset();
+        systemOutPane.reset();
         referencePane.reset();
     }
 
@@ -388,16 +456,16 @@ public class AcvContentController implements Initializable {
             context.selectedAnnotationTypeProperty.setValue(newValue.getAnnotationName());
             resetAnnotationButtons(newValue.getAnnotationName());
         } else {
-            targetPane.clearFeatureTree();
+            systemOutPane.clearFeatureTree();
             referencePane.clearFeatureTree();
-            selectedAnnotationButton.setValue(null);
         }
+        selectedAnnotationButton.setValue(null);
     });
 
     private ChangeListener<String> onMatchTypeSelectionChanged = ((observable, oldValue, newValue) -> createTableRows());
 
     private ChangeListener<AnnotationButton> onAnnotationButtonClicked = ((observable, oldValue, newValue) -> {
-        targetPane.clearFeatureTree();
+        systemOutPane.clearFeatureTree();
         referencePane.clearFeatureTree();
 
         if (oldValue != null) {
@@ -415,6 +483,11 @@ public class AcvContentController implements Initializable {
             if (newValue.matchingButtons.size() == 1) {
                 newValue.matchingButtons.forEach(AnnotationButton::fire);
             }
+
+            // update scroll bar
+            double scrollPaneHeight = systemOutPane.getScrollPane().getContent().getBoundsInLocal().getHeight();
+            double nodeHeight = newValue.getBoundsInParent().getMaxY();
+            systemOutPane.getScrollPane().setVvalue(nodeHeight / scrollPaneHeight);
         }
     });
 }

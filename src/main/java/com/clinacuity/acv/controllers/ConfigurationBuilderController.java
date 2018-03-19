@@ -20,7 +20,10 @@ import org.reactfx.util.FxTimer;
 import java.io.File;
 import java.net.URL;
 import java.time.Duration;
-import java.util.*;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.ResourceBundle;
 
 public class ConfigurationBuilderController implements Initializable {
     private static final Logger logger = LogManager.getLogger();
@@ -162,7 +165,6 @@ public class ConfigurationBuilderController implements Initializable {
         for (Node child: annotationDropBox.getChildren()) {
             if (child instanceof AnnotationDropBox) {
                 AnnotationDropBox box = (AnnotationDropBox)child;
-                // TODO: there are no child cards here .. there are child BOXES
                 if (!box.hasValidCards()) {
                     return false;
                 }

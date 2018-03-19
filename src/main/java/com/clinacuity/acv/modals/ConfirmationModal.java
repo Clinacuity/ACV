@@ -1,12 +1,13 @@
 package com.clinacuity.acv.modals;
 
-import com.jfoenix.controls.JFXButton;
 import javafx.event.ActionEvent;
 import javafx.event.EventHandler;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
+import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.Separator;
+import javafx.scene.control.TextArea;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
@@ -17,8 +18,8 @@ public class ConfirmationModal {
     private static final Logger logger = LogManager.getLogger();
 
     private static Modal modal = null;
-    private static JFXButton confirmButton = null;
-    private static JFXButton cancelButton = null;
+    private static Button confirmButton = null;
+    private static Button cancelButton = null;
 
     public static void createModal(String title, String message) {
         createModal(title, message, "CONFIRM", "CANCEL");
@@ -27,19 +28,20 @@ public class ConfirmationModal {
     public static void createModal(String title, String message, String confirmText, String cancelText) {
         VBox box = new VBox();
         box.getStylesheets().add("/app.css");
+        box.getStyleClass().add("card");
         box.setMaxHeight(Double.MAX_VALUE);
 
         Label titleLabel = new Label(title);
         titleLabel.getStyleClass().add("text-header-two");
         titleLabel.setPadding(new Insets(5.0d, 0.0d, 5.0d, 10.0d));
 
-        Label messageLabel = new Label(message);
-        messageLabel.getStyleClass().add("text-medium-normal");
-        messageLabel.setPadding(new Insets(10.0d, 0.0d, 10.0d, 5.0d));
-        messageLabel.setWrapText(true);
-        messageLabel.setMaxHeight(Double.MAX_VALUE);
-        messageLabel.setAlignment(Pos.TOP_LEFT);
-        VBox.setVgrow(messageLabel, Priority.ALWAYS);
+        TextArea messageArea = new TextArea(message);
+        messageArea.setEditable(false);
+        messageArea.getStyleClass().add("text-medium-normal");
+        messageArea.setWrapText(true);
+        messageArea.setMaxHeight(Double.MAX_VALUE);
+        messageArea.setFocusTraversable(false);
+        VBox.setVgrow(messageArea, Priority.ALWAYS);
 
         HBox buttonBox = new HBox();
         buttonBox.setAlignment(Pos.BOTTOM_RIGHT);
@@ -47,18 +49,16 @@ public class ConfirmationModal {
         buttonBox.maxWidthProperty().bind(box.widthProperty());
         buttonBox.setSpacing(20.0d);
 
-        confirmButton = new JFXButton(confirmText);
-        confirmButton.getStyleClass().addAll("button-raised", "button-blue", "text-medium-normal");
-        confirmButton.setButtonType(JFXButton.ButtonType.RAISED);
+        confirmButton = new Button(confirmText);
+        confirmButton.getStyleClass().addAll("button-blue", "text-medium-normal");
 
-        cancelButton = new JFXButton(cancelText);
-        cancelButton.getStyleClass().addAll("button-raised", "button-gray", "text-medium-normal");
-        cancelButton.setButtonType(JFXButton.ButtonType.RAISED);
+        cancelButton = new Button(cancelText);
+        cancelButton.getStyleClass().addAll("button-gray", "text-medium-normal");
         cancelButton.maxWidthProperty().bind(confirmButton.widthProperty());
         cancelButton.minWidthProperty().bind(confirmButton.widthProperty());
 
         buttonBox.getChildren().addAll(cancelButton, confirmButton);
-        box.getChildren().addAll(titleLabel, new Separator(), messageLabel, new Separator(), buttonBox);
+        box.getChildren().addAll(titleLabel, new Separator(), messageArea, new Separator(), buttonBox);
 
         modal = new Modal(box);
     }

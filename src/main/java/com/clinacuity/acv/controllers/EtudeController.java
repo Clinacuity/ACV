@@ -2,6 +2,7 @@ package com.clinacuity.acv.controllers;
 
 import com.clinacuity.acv.context.AcvContext;
 import com.clinacuity.acv.modals.ConfirmationModal;
+import com.clinacuity.acv.modals.WarningModal;
 import com.clinacuity.acv.tasks.EtudeTask;
 import com.jfoenix.controls.JFXCheckBox;
 import com.jfoenix.controls.JFXTextField;
@@ -11,6 +12,7 @@ import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.StackPane;
+import javafx.scene.layout.VBox;
 import javafx.stage.DirectoryChooser;
 import javafx.stage.FileChooser;
 import org.apache.logging.log4j.LogManager;
@@ -34,10 +36,10 @@ public class EtudeController implements Initializable{
     private static EtudeTask etudeTask = null;
     private AcvContext context = AcvContext.getInstance();
 
-    @FXML private HBox cardHBox;
     @FXML private ScrollPane scrollPane;
     @FXML private StackPane leftSideCard;
     @FXML private StackPane rightSideCard;
+    @FXML private VBox textFieldsBox;
     @FXML private JFXTextField referenceConfigInputField;
     @FXML private JFXTextField testConfigInputField;
     @FXML private JFXTextField referenceInputTextField;
@@ -45,7 +47,6 @@ public class EtudeController implements Initializable{
     @FXML private JFXTextField outputDirectoryTextField;
     @FXML private JFXTextField scoreKeyTextField;
     @FXML private JFXTextField punctuationTextField;
-    @FXML private Label scoreKeyError;
     @FXML private JFXTextField scoreValuesTextField;
     @FXML private JFXTextField filePrefixTextField;
     @FXML private JFXTextField fileSuffixTextField;
@@ -56,6 +57,9 @@ public class EtudeController implements Initializable{
     @FXML private JFXCheckBox metricsRecall;
     @FXML private JFXCheckBox metricsF1;
     @FXML private JFXCheckBox fuzzyMatchingCheckbox;
+    @FXML private JFXCheckBox exactMatching;
+    @FXML private JFXCheckBox partialMatching;
+    @FXML private JFXCheckBox fullyContainedMatching;
     @FXML private JFXCheckBox byFileCheckbox;
     @FXML private JFXCheckBox byFileAndTypeCheckbox;
     @FXML private JFXCheckBox byTypeCheckbox;
@@ -70,15 +74,12 @@ public class EtudeController implements Initializable{
     @Override
     public void initialize(URL location, ResourceBundle resources) {
         scrollPane.widthProperty().addListener((obs, old, newValue) -> {
-            double width = newValue.doubleValue() - 60.0d;
+            double width = newValue.doubleValue() - 10.0d;
             rightSideCard.setMinWidth(width * 0.5d);
             rightSideCard.setMaxWidth(width * 0.5d);
-            leftSideCard.setMinWidth(width * 0.5d);
-            leftSideCard.setMaxWidth(width * 0.5d);
-            cardHBox.setSpacing(20.0d);
+            textFieldsBox.setMinWidth(width * 0.5d);
+            textFieldsBox.setMaxWidth(width * 0.5d);
         });
-
-        bindElementsToProperties();
 
         referenceConfigInputField.focusedProperty().addListener(
                 (obs, old, newValue) -> focusChanged(newValue, referenceConfigInputField, true));
@@ -91,17 +92,11 @@ public class EtudeController implements Initializable{
         outputDirectoryTextField.focusedProperty().addListener(
                 (obs, old, newValue) -> focusChanged(newValue, outputDirectoryTextField, false));
 
-        scoreKeyTextField.focusedProperty().addListener((obs, old, isFocused) -> {
-            if (isFocused) {
-                scoreKeyError.setVisible(false);
-            } else {
-                if (scoreKeyTextField.getText().equals("")) {
-                    scoreKeyError.setVisible(true);
-                } else {
-                    scoreKeyError.setVisible(false);
-                }
-            }
-        });
+        exactMatching.disableProperty().bind(fuzzyMatchingCheckbox.selectedProperty().not());
+        partialMatching.disableProperty().bind(fuzzyMatchingCheckbox.selectedProperty().not());
+        fullyContainedMatching.disableProperty().bind(fuzzyMatchingCheckbox.selectedProperty().not());
+
+        bindElementsToProperties();
     }
 
     @FXML private void runEtudeButtonAction() throws IOException {
@@ -111,6 +106,9 @@ public class EtudeController implements Initializable{
             } else {
                 confirmEtudeOverwrite();
             }
+        } else {
+            WarningModal.createModal("Invalid fields", "There are some invalid fields; please double-check the input fields");
+            WarningModal.show();
         }
     }
 
@@ -123,10 +121,17 @@ public class EtudeController implements Initializable{
 
         etudeTask.setOnSucceeded(event -> {
             context.corpusFilePathProperty.setValue(outputDirectoryTextField.getText() + "/" + CORPUS_FILE);
-            context.targetDirectoryProperty.setValue(outputDirectoryTextField.getText() + "/" + SYSTEM_OUT_SUBDIR);
+            context.systemOutDirectoryProperty.setValue(outputDirectoryTextField.getText() + "/" + SYSTEM_OUT_SUBDIR);
             context.referenceDirectoryProperty.setValue(outputDirectoryTextField.getText() + "/" + REFERENCE_SUBDIR);
 
             AcvContext.loadPage(NavBarController.NavBarPages.COMPARISON_VIEW);
+            AcvContext.getInstance().contentLoading.setValue(false);
+        });
+
+        etudeTask.setOnFailed(event -> {
+            WarningModal.createModal("ETUDE Engine Failure",
+                    "The ETUDE Engines ran into the following error:\n\n" + etudeTask.getErrorString());
+            WarningModal.show();
             AcvContext.getInstance().contentLoading.setValue(false);
         });
 
@@ -142,7 +147,6 @@ public class EtudeController implements Initializable{
         etudeTask.setMetricsFN(metricsFN.isSelected());
         etudeTask.setMetricsPrecision(metricsPrecision.isSelected());
         etudeTask.setMetricsRecall(metricsRecall.isSelected());
-
         etudeTask.setMetricsF1(metricsF1.isSelected());
         etudeTask.setByFile(byFileCheckbox.isSelected());
         etudeTask.setByFileAndType(byFileAndTypeCheckbox.isSelected());
@@ -150,6 +154,12 @@ public class EtudeController implements Initializable{
         etudeTask.setByTypeAndFile(byTypeAndFileCheckbox.isSelected());
         etudeTask.setIgnoreWhitespace(ignoreWhitespaceCheckbox.isSelected());
         etudeTask.setIgnorePunctuation(ignorePunctuationCheckbox.isSelected());
+
+        if (fuzzyMatchingCheckbox.isSelected()) {
+            etudeTask.setExactMatch(exactMatching.isSelected());
+            etudeTask.setPartialMatch(partialMatching.isSelected());
+            etudeTask.setFullyContainedMatch(fullyContainedMatching.isSelected());
+        }
 
         if (!scoreKeyTextField.getText().equals("") && scoreKeyTextField.getText() != null) {
             etudeTask.setScoreKey(scoreKeyTextField.getText());
@@ -180,13 +190,7 @@ public class EtudeController implements Initializable{
      * @return  Returns true if inputs are valid; false otherwise and etude won't run.
      */
     private boolean checkInputs() {
-        boolean passes = true;
-
-        if (failingFields.size() != 0 || scoreKeyError.isVisible()) {
-            passes = false;
-        }
-        
-        return passes;
+        return failingFields.size() == 0;
     }
 
     /**
@@ -309,44 +313,83 @@ public class EtudeController implements Initializable{
     }
     
     private void bindElementsToProperties() {
-        metricsTP.setSelected(Boolean.parseBoolean(AcvContext.getProperty("TP", metricsTP.isSelected())));
-        metricsTP.selectedProperty().addListener((obs, old, newValue) -> AcvContext.setProperty("TP", newValue.toString()));
+        testConfigInputField.setText(AcvContext.getProperty("test_config", ""));
+        testConfigInputField.textProperty().addListener((obs, old, newValue) -> AcvContext.setProperty("test_config", newValue));
 
-        metricsFP.setSelected(Boolean.parseBoolean(AcvContext.getProperty("FP", metricsFP.isSelected())));
-        metricsFP.selectedProperty().addListener((obs, old, newValue) -> AcvContext.setProperty("FP", newValue.toString()));
+        referenceConfigInputField.setText(AcvContext.getProperty("ref_config", ""));
+        referenceConfigInputField.textProperty().addListener((obs, old, newValue) -> AcvContext.setProperty("ref_config", newValue));
 
-        metricsFN.setSelected(Boolean.parseBoolean(AcvContext.getProperty("FN", metricsFN.isSelected())));
-        metricsFN.selectedProperty().addListener((obs, old, newValue) -> AcvContext.setProperty("FN", newValue.toString()));
+        testInputTextField.setText(AcvContext.getProperty("test_directory", ""));
+        testInputTextField.textProperty().addListener((obs, old, newValue) -> AcvContext.setProperty("test_directory", newValue));
 
-        metricsPrecision.setSelected(Boolean.parseBoolean(AcvContext.getProperty("PRECISION", metricsPrecision.isSelected())));
-        metricsPrecision.selectedProperty().addListener((obs, old, newValue) -> AcvContext.setProperty("PRECISION", newValue.toString()));
+        referenceInputTextField.setText(AcvContext.getProperty("ref_directory", ""));
+        referenceInputTextField.textProperty().addListener((obs, old, newValue) -> AcvContext.setProperty("ref_directory", newValue));
 
-        metricsRecall.setSelected(Boolean.parseBoolean(AcvContext.getProperty("RECALL", metricsRecall.isSelected())));
-        metricsRecall.selectedProperty().addListener((obs, old, newValue) -> AcvContext.setProperty("RECALL", newValue.toString()));
+        filePrefixTextField.setText(AcvContext.getProperty("file_prefix", ""));
+        filePrefixTextField.textProperty().addListener((obs, old, newValue) -> AcvContext.setProperty("file_prefix", newValue));
+        
+        fileSuffixTextField.setText(AcvContext.getProperty("file_suffix", ""));
+        fileSuffixTextField.textProperty().addListener((obs, old, newValue) -> AcvContext.setProperty("file_suffix", newValue));
+        
+        outputDirectoryTextField.setText(AcvContext.getProperty("output_directory", ""));
+        outputDirectoryTextField.textProperty().addListener((obs, old, newValue) -> AcvContext.setProperty("output_directory", newValue));
 
-        metricsF1.setSelected(Boolean.parseBoolean(AcvContext.getProperty("F1", metricsF1.isSelected())));
-        metricsF1.selectedProperty().addListener((obs, old, newValue) -> AcvContext.setProperty("F1", newValue.toString()));
+        scoreKeyTextField.setText(AcvContext.getProperty("score_key", ""));
+        scoreKeyTextField.textProperty().addListener((obs, old, newValue) -> AcvContext.setProperty("score_key", newValue));
 
-        fuzzyMatchingCheckbox.setSelected(Boolean.parseBoolean(AcvContext.getProperty("FUZZY_MATCHING", fuzzyMatchingCheckbox.isSelected())));
-        fuzzyMatchingCheckbox.selectedProperty().addListener((obs, old, newValue) -> AcvContext.setProperty("FUZZY_MATCHING", newValue.toString()));
+        scoreValuesTextField.setText(AcvContext.getProperty("score_values", ""));
+        scoreValuesTextField.textProperty().addListener((obs, old, newValue) -> AcvContext.setProperty("score_values", newValue));
 
-        byFileCheckbox.setSelected(Boolean.parseBoolean(AcvContext.getProperty("BY_FILE", byFileCheckbox.isSelected())));
-        byFileCheckbox.selectedProperty().addListener((obs, old, newValue) -> AcvContext.setProperty("BY_FILE", newValue.toString()));
+        metricsTP.setSelected(Boolean.parseBoolean(AcvContext.getProperty("tp", metricsTP.isSelected())));
+        metricsTP.selectedProperty().addListener((obs, old, newValue) -> AcvContext.setProperty("tp", newValue.toString()));
 
-        byFileAndTypeCheckbox.setSelected(Boolean.parseBoolean(AcvContext.getProperty("BY_FILE_AND_TYPE", byFileAndTypeCheckbox.isSelected())));
-        byFileAndTypeCheckbox.selectedProperty().addListener((obs, old, newValue) -> AcvContext.setProperty("BY_FILE_AND_TYPE", newValue.toString()));
+        metricsFP.setSelected(Boolean.parseBoolean(AcvContext.getProperty("fp", metricsFP.isSelected())));
+        metricsFP.selectedProperty().addListener((obs, old, newValue) -> AcvContext.setProperty("fp", newValue.toString()));
 
-        byTypeCheckbox.setSelected(Boolean.parseBoolean(AcvContext.getProperty("BY_TYPE", byTypeCheckbox.isSelected())));
-        byTypeCheckbox.selectedProperty().addListener((obs, old, newValue) -> AcvContext.setProperty("BY_TYPE", newValue.toString()));
+        metricsFN.setSelected(Boolean.parseBoolean(AcvContext.getProperty("fn", metricsFN.isSelected())));
+        metricsFN.selectedProperty().addListener((obs, old, newValue) -> AcvContext.setProperty("fn", newValue.toString()));
 
-        byTypeAndFileCheckbox.setSelected(Boolean.parseBoolean(AcvContext.getProperty("BY_TYPE_AND_FILE", byTypeAndFileCheckbox.isSelected())));
-        byTypeAndFileCheckbox.selectedProperty().addListener((obs, old, newValue) -> AcvContext.setProperty("BY_TYPE_AND_FILE", newValue.toString()));
+        metricsPrecision.setSelected(Boolean.parseBoolean(AcvContext.getProperty("precision", metricsPrecision.isSelected())));
+        metricsPrecision.selectedProperty().addListener((obs, old, newValue) -> AcvContext.setProperty("precision", newValue.toString()));
 
-        ignoreWhitespaceCheckbox.setSelected(Boolean.parseBoolean(AcvContext.getProperty("IGNORE_WHITESPACE", ignoreWhitespaceCheckbox.isSelected())));
-        ignoreWhitespaceCheckbox.selectedProperty().addListener((obs, old, newValue) -> AcvContext.setProperty("IGNORE_WHITESPACE", newValue.toString()));
+        metricsRecall.setSelected(Boolean.parseBoolean(AcvContext.getProperty("recall", metricsRecall.isSelected())));
+        metricsRecall.selectedProperty().addListener((obs, old, newValue) -> AcvContext.setProperty("recall", newValue.toString()));
 
-        ignorePunctuationCheckbox.setSelected(Boolean.parseBoolean(AcvContext.getProperty("IGNORE_PUNCTUATION", ignorePunctuationCheckbox.isSelected())));
-        ignorePunctuationCheckbox.selectedProperty().addListener((obs, old, newValue) -> AcvContext.setProperty("IGNORE_PUNCTUATION", newValue.toString()));
+        metricsF1.setSelected(Boolean.parseBoolean(AcvContext.getProperty("f1", metricsF1.isSelected())));
+        metricsF1.selectedProperty().addListener((obs, old, newValue) -> AcvContext.setProperty("f1", newValue.toString()));
+
+        exactMatching.setSelected(Boolean.parseBoolean(AcvContext.getProperty("exact_matching", exactMatching.isSelected())));
+        exactMatching.selectedProperty().addListener((obs, old, newValue) -> AcvContext.setProperty("exact_matching", newValue.toString()));
+
+        partialMatching.setSelected(Boolean.parseBoolean(AcvContext.getProperty("partial_matching", partialMatching.isSelected())));
+        partialMatching.selectedProperty().addListener((obs, old, newValue) -> AcvContext.setProperty("partial_matching", newValue.toString()));
+
+        fullyContainedMatching.setSelected(Boolean.parseBoolean(AcvContext.getProperty("fully_contained_matching", fullyContainedMatching.isSelected())));
+        fullyContainedMatching.selectedProperty().addListener((obs, old, newValue) -> AcvContext.setProperty("fully_contained_matching", newValue.toString()));
+
+        fuzzyMatchingCheckbox.setSelected(Boolean.parseBoolean(AcvContext.getProperty("fuzzy_matching", fuzzyMatchingCheckbox.isSelected())));
+        fuzzyMatchingCheckbox.selectedProperty().addListener((obs, old, newValue) -> AcvContext.setProperty("fuzzy_matching", newValue.toString()));
+
+        byFileCheckbox.setSelected(Boolean.parseBoolean(AcvContext.getProperty("by_file", byFileCheckbox.isSelected())));
+        byFileCheckbox.selectedProperty().addListener((obs, old, newValue) -> AcvContext.setProperty("by_file", newValue.toString()));
+
+        byFileAndTypeCheckbox.setSelected(Boolean.parseBoolean(AcvContext.getProperty("by_file_and_type", byFileAndTypeCheckbox.isSelected())));
+        byFileAndTypeCheckbox.selectedProperty().addListener((obs, old, newValue) -> AcvContext.setProperty("by_file_and_type", newValue.toString()));
+
+        byTypeCheckbox.setSelected(Boolean.parseBoolean(AcvContext.getProperty("by_type", byTypeCheckbox.isSelected())));
+        byTypeCheckbox.selectedProperty().addListener((obs, old, newValue) -> AcvContext.setProperty("by_type", newValue.toString()));
+
+        byTypeAndFileCheckbox.setSelected(Boolean.parseBoolean(AcvContext.getProperty("by_type_and_file", byTypeAndFileCheckbox.isSelected())));
+        byTypeAndFileCheckbox.selectedProperty().addListener((obs, old, newValue) -> AcvContext.setProperty("by_type_and_file", newValue.toString()));
+
+        ignoreWhitespaceCheckbox.setSelected(Boolean.parseBoolean(AcvContext.getProperty("ignore_whitespace", ignoreWhitespaceCheckbox.isSelected())));
+        ignoreWhitespaceCheckbox.selectedProperty().addListener((obs, old, newValue) -> AcvContext.setProperty("ignore_whitespace", newValue.toString()));
+
+        ignorePunctuationCheckbox.setSelected(Boolean.parseBoolean(AcvContext.getProperty("ignore_punctuation", ignorePunctuationCheckbox.isSelected())));
+        ignorePunctuationCheckbox.selectedProperty().addListener((obs, old, newValue) -> AcvContext.setProperty("ignore_punctuation", newValue.toString()));
+
+        punctuationTextField.setText(AcvContext.getProperty("punctuation_regex", ""));
+        punctuationTextField.textProperty().addListener((obs, old, newValue) -> AcvContext.setProperty("punctuation_regex", newValue));
     }
     
     @FXML private void pickReferenceConfigFile() {
@@ -354,6 +397,8 @@ public class EtudeController implements Initializable{
         if (file != null) {
             referenceConfigInputField.setText(file.getAbsolutePath());
         }
+
+        focusChanged(false, referenceConfigInputField, true);
     }
 
     @FXML private void pickTestConfigFile() {
@@ -361,6 +406,8 @@ public class EtudeController implements Initializable{
         if (file != null) {
             testConfigInputField.setText(file.getAbsolutePath());
         }
+
+        focusChanged(false, testConfigInputField, true);
     }
 
     @FXML private void pickReferenceInDirectory() {
@@ -368,6 +415,8 @@ public class EtudeController implements Initializable{
         if (directory != null) {
             referenceInputTextField.setText(directory.getAbsolutePath());
         }
+
+        focusChanged(false, referenceInputTextField, false);
     }
 
     @FXML private void pickTestInDirectory() {
@@ -375,6 +424,8 @@ public class EtudeController implements Initializable{
         if (directory != null) {
             testInputTextField.setText(directory.getAbsolutePath());
         }
+
+        focusChanged(false, testInputTextField, false);
     }
 
     @FXML private void pickMainOutputDirectory() {
@@ -382,6 +433,8 @@ public class EtudeController implements Initializable{
         if (directory != null) {
             outputDirectoryTextField.setText(directory.getAbsolutePath());
         }
+
+        focusChanged(false, outputDirectoryTextField, false);
     }
 
     private File getFile(String title) {

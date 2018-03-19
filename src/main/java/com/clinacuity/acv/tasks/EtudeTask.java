@@ -4,7 +4,6 @@ import com.clinacuity.acv.controllers.EtudeController;
 import javafx.concurrent.Task;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
@@ -33,7 +32,6 @@ public class EtudeTask extends Task<Void> {
     private String scoreValues = null;
     private String filePrefix = null;
     private String fileSuffix = null;
-    private String fuzzyMatchFlags = null;
     private String ignorePunctuationRegex = null;
     private boolean metricsTP = false;
     private boolean metricsFP = false;
@@ -41,6 +39,9 @@ public class EtudeTask extends Task<Void> {
     private boolean metricsPrecision = false;
     private boolean metricsRecall = false;
     private boolean metricsF1 = false;
+    private boolean exactMatch = false;
+    private boolean partialMatch = false;
+    private boolean fullyContainedMatch = false;
     private boolean byFile = false;
     private boolean byFileAndType = false;
     private boolean byType = false;
@@ -64,12 +65,18 @@ public class EtudeTask extends Task<Void> {
     public void setMetricsPrecision(boolean value) { metricsPrecision = value; }
     public void setMetricsRecall(boolean value) { metricsRecall = value; }
     public void setMetricsF1(boolean value) { metricsF1 = value; }
+    public void setExactMatch(boolean value) { exactMatch = value; }
+    public void setPartialMatch(boolean value) { partialMatch = value; }
+    public void setFullyContainedMatch(boolean value) { fullyContainedMatch = value; }
     public void setByFile(boolean value) { byFile = value; }
     public void setByFileAndType(boolean value) { byFileAndType= value; }
     public void setByType(boolean value) { byType = value; }
     public void setByTypeAndFile(boolean value) { byTypeAndFile = value; }
     public void setIgnoreWhitespace(boolean value) { ignoreWhitespace = value; }
     public void setIgnorePunctuation(boolean value) { ignorePunctuation = value; }
+
+    private String errorString = "";
+    public String getErrorString() { return errorString; }
 
     public EtudeTask() {
         setOnCancelled(event -> {
@@ -81,7 +88,9 @@ public class EtudeTask extends Task<Void> {
     }
 
     @Override
-    public Void call() {
+    protected Void call() {
+        errorString = "";
+
         try {
             createOutputDirectories();
 
@@ -99,9 +108,18 @@ public class EtudeTask extends Task<Void> {
                 logger.warn(line);
             }
 
+            StringBuilder errBuilder = new StringBuilder();
             while ((line = errStream.readLine()) != null) {
-                logger.warn(line);
+                logger.error(line);
+                errBuilder.append(line);
+                errBuilder.append("\n");
             }
+
+            errorString = errBuilder.toString();
+            if (errorString.length() > 0) {
+                throw new EtudeEngineException(errorString);
+            }
+
         } catch (IOException e) {
             logger.throwing(e);
             setException(e);
@@ -134,7 +152,9 @@ public class EtudeTask extends Task<Void> {
         scoreValues = null;
         filePrefix = null;
         fileSuffix = null;
-        fuzzyMatchFlags = null;
+        exactMatch = false;
+        partialMatch = false;
+        fullyContainedMatch = false;
         ignorePunctuationRegex = null;
         byFile = false;
         byFileAndType = false;
@@ -161,7 +181,7 @@ public class EtudeTask extends Task<Void> {
     }
 
     private String getCommand() {
-        String command = getEtudeLocation();
+        String command = getEtudeLocation() + " --progressbar-output none";
 
         if (referenceConfigFilePath != null) {
             command += " --reference-config " + referenceConfigFilePath;
@@ -219,10 +239,6 @@ public class EtudeTask extends Task<Void> {
             command += " --file-suffix " + fileSuffix;
         }
 
-        if (fuzzyMatchFlags != null) {
-            command += " --fuzzy-match-flags " + fuzzyMatchFlags;
-        }
-
         if (byFile) {
             command += " --by-file";
         }
@@ -254,6 +270,8 @@ public class EtudeTask extends Task<Void> {
         }
 
         command += getMetricsValues();
+
+        command += getFuzzyMatchFlags();
 
         return command;
     }
@@ -308,16 +326,40 @@ public class EtudeTask extends Task<Void> {
         return " -m " + String.join(" ", metrics);
     }
 
+    private String getFuzzyMatchFlags() {
+        String matches = "";
+
+        if (exactMatch) {
+            matches += " exact";
+        }
+
+        if (partialMatch) {
+            matches += " partial";
+        }
+
+        if (fullyContainedMatch) {
+            matches += " fully-contained";
+        }
+
+        return matches.length() > 0 ? " --fuzzy-match-flags " + matches : " --fuzzy-match-flags exact";
+    }
+
     private void setFailing(Exception exception) {
         logger.throwing(exception);
         setException(exception);
-        failed();
+        throw new RuntimeException(exception);
     }
 
     private class MissingArgumentException extends Exception {
         MissingArgumentException(String missingArgument) {
             String message = "The argument <" + missingArgument + "> is required!";
             updateMessage(message);
+        }
+    }
+
+    private class EtudeEngineException extends RuntimeException {
+        EtudeEngineException(String error) {
+            updateMessage(error);
         }
     }
 }

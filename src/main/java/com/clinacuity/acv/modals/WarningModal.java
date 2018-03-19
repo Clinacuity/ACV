@@ -1,10 +1,11 @@
 package com.clinacuity.acv.modals;
 
-import com.jfoenix.controls.JFXButton;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
+import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.Separator;
+import javafx.scene.control.TextArea;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
@@ -23,20 +24,20 @@ public class WarningModal {
     public static void createModal(String title, String message, String confirmButtonText) {
         VBox box = new VBox();
         box.getStylesheets().add("/app.css");
+        box.getStyleClass().add("card");
         box.setMaxHeight(Double.MAX_VALUE);
 
         Label titleLabel = new Label(title);
         titleLabel.getStyleClass().add("text-header-two");
         titleLabel.setPadding(new Insets(5.0d, 0.0d, 5.0d, 10.0d));
 
-        Label messageLabel = new Label(message);
-        messageLabel.setAlignment(Pos.CENTER_LEFT);
-        messageLabel.getStyleClass().add("text-medium-normal");
-        messageLabel.setPadding(new Insets(10.0d, 0.0d, 10.0d, 5.0d));
-        messageLabel.setWrapText(true);
-        messageLabel.setMaxHeight(Double.MAX_VALUE);
-        messageLabel.setAlignment(Pos.TOP_LEFT);
-        VBox.setVgrow(messageLabel, Priority.ALWAYS);
+        TextArea messageArea = new TextArea(message);
+        messageArea.setEditable(false);
+        messageArea.getStyleClass().add("text-medium-normal");
+        messageArea.setWrapText(true);
+        messageArea.setMaxHeight(Double.MAX_VALUE);
+        messageArea.setFocusTraversable(false);
+        VBox.setVgrow(messageArea, Priority.ALWAYS);
 
         HBox buttonBox = new HBox();
         buttonBox.setAlignment(Pos.BOTTOM_RIGHT);
@@ -44,13 +45,12 @@ public class WarningModal {
         buttonBox.maxWidthProperty().bind(box.widthProperty());
         buttonBox.setSpacing(20.0d);
 
-        JFXButton closeButton = new JFXButton(confirmButtonText);
-        closeButton.getStyleClass().addAll("button-raised", "button-blue", "text-medium-normal");
-        closeButton.setButtonType(JFXButton.ButtonType.RAISED);
+        Button closeButton = new Button(confirmButtonText);
+        closeButton.getStyleClass().addAll("button-blue", "text-medium-normal");
         closeButton.setOnAction(event -> closeModal());
 
         buttonBox.getChildren().addAll(closeButton);
-        box.getChildren().addAll(titleLabel, new Separator(), messageLabel, new Separator(), buttonBox);
+        box.getChildren().addAll(titleLabel, new Separator(), messageArea, new Separator(), buttonBox);
 
         modal = new Modal(box);
     }

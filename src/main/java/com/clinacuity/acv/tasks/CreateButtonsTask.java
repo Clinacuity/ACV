@@ -9,48 +9,77 @@ import javafx.scene.layout.AnchorPane;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import static com.clinacuity.acv.controllers.ConfigurationBuilderController.CorpusType;
 
-public class CreateButtonsTask extends Task<List<AnnotationButton>> {
-    private static final Logger logger = LogManager.getLogger();
-
-    private List<JsonObject> taskAnnotations;
-    private List<LineNumberedLabel> taskLabels;
-    private List<AnnotationButton> taskButtons = new ArrayList<>();
-    private AnnotationButton previousButton = null;
+public class CreateButtonsTask extends Task<Map<CorpusType, List<AnnotationButton>>> {
+    private List<JsonObject> systemAnnotations;
+    private List<JsonObject> refAnnotations;
+    private List<LineNumberedLabel> systemLabels;
+    private List<LineNumberedLabel> refLabels;
+    private Map<CorpusType, List<AnnotationButton>> results = new HashMap<>();
     private double characterHeight = -1.0;
 
-    public CreateButtonsTask(List<JsonObject> annotations, List<LineNumberedLabel> labels) {
-        taskAnnotations = annotations;
-        Collections.sort(labels);
-        taskLabels = labels;
-        characterHeight = AnnotatedDocumentPane.getCharacterHeight();
+    public CreateButtonsTask(List<JsonObject> systemAnnotations, List<LineNumberedLabel> systemLabels,
+                          List<JsonObject> refAnnotations, List<LineNumberedLabel> refLabels) {
+        Collections.sort(systemLabels);
+        Collections.sort(refLabels);
+        this.systemAnnotations = systemAnnotations;
+        this.systemLabels = systemLabels;
+        this.refAnnotations = refAnnotations;
+        this.refLabels = refLabels;
+        this.characterHeight = AnnotatedDocumentPane.getCharacterHeight();
+
+        results = new HashMap<>();
+        results.put(CorpusType.REFERENCE, new ArrayList<>());
+        results.put(CorpusType.SYSTEM, new ArrayList<>());
+
     }
 
-    @Override public List<AnnotationButton> call() {
-        int size = taskAnnotations.size();
+    @Override public Map<CorpusType, List<AnnotationButton>> call() {
+        int systemSize = systemAnnotations.size();
+        int referenceSize = refAnnotations.size();
+        int total = systemSize + referenceSize;
 
-        for (int i = 0; i < size; i++) {
-            processAnnotation(taskAnnotations.get(i));
-            updateProgress(i, size);
+        for (int i = 0; i < systemSize; i++) {
+            createAnnotationButtons(systemAnnotations.get(i), systemLabels, results.get(CorpusType.SYSTEM));
+            updateProgress(i, total);
         }
 
-        if (taskButtons == null) {
-            failed();
-            return null;
+        // create reference buttons
+        for (int i = 0; i < referenceSize; i++) {
+            createAnnotationButtons(refAnnotations.get(i), refLabels, results.get(CorpusType.REFERENCE));
+            updateProgress(systemSize + i, total);
+        }
+
+        if (results == null) {
+            results = new HashMap<>();
         } else {
-            succeeded();
-            return taskButtons;
+            Collections.sort(results.get(CorpusType.SYSTEM));
+            Collections.sort(results.get(CorpusType.REFERENCE));
+
+            setPreviousAndNextValues();
         }
+
+        updateValue(results);
+        return results;
     }
 
-    private void processAnnotation(JsonObject annotation) {
-        // once the running Length exceeds the begin, we have found our BEGIN label
+    /**
+     * Creates the annotation buttons for an annotation
+     * Note that this will create multiple buttons if an annotation spans multiple lines (labels)
+     * @param annotation    The annotation for which to create a button
+     */
+    private void createAnnotationButtons(JsonObject annotation, List<LineNumberedLabel> targetLabels, List<AnnotationButton> targetButtonList) {
         int begin = annotation.get("begin_pos").getAsInt();
         int end = annotation.get("end_pos").getAsInt();
 
-        List<LineNumberedLabel> spannedLabels = getSpannedLabels(begin, end);
-        addButtons(annotation, spannedLabels, begin, end);
+        List<LineNumberedLabel> spannedLabels = getSpannedLabels(begin, end, targetLabels);
+        addButtons(annotation, spannedLabels, begin, end, targetLabels, targetButtonList);
     }
 
     /**
@@ -59,15 +88,14 @@ public class CreateButtonsTask extends Task<List<AnnotationButton>> {
      * @param end   The end offset relative to the JsonObject's rew text
      * @return      Returns a list of the labels which are spanned by the given annotation's begin/end values
      */
-    private List<LineNumberedLabel> getSpannedLabels(int begin, int end) {
+    @SuppressWarnings("ForLoopReplaceableByForEach")
+    private List<LineNumberedLabel> getSpannedLabels(int begin, int end, List<LineNumberedLabel> targetLabels) {
         List<LineNumberedLabel> spannedLabels = new ArrayList<>();
         int currentLineNumber = 1;
 
         boolean beginFound = false;
-//        taskLabels.forEach(label);
-
-        for (int i = 0; i < taskLabels.size(); i++) {
-            LineNumberedLabel index = taskLabels.get(i);
+        for (int i = 0; i < targetLabels.size(); i++) {
+            LineNumberedLabel index = targetLabels.get(i);
             int indexTextLength = index.getLineText().length();
             int offset = index.getTextOffset();
 
@@ -83,10 +111,12 @@ public class CreateButtonsTask extends Task<List<AnnotationButton>> {
             }
 
             if (beginFound) {
+                // this should always resolve to false
                 if (!spannedLabels.contains(index)) {
                     spannedLabels.add(index);
                 }
 
+                // if we found the end of the label, exit
                 if (offset <= end && offset + indexTextLength >= end) {
                     break;
                 }
@@ -109,26 +139,21 @@ public class CreateButtonsTask extends Task<List<AnnotationButton>> {
      * @param begin         The begin offset relative to the JsonObject's raw text
      * @param end           The end offset relative to the JsonObject's rew text
      */
-    private void addButtons(JsonObject annotation, List<LineNumberedLabel> labels, int begin, int end) {
+    private void addButtons(JsonObject annotation, List<LineNumberedLabel> labels, int begin, int end,
+                            List<LineNumberedLabel> targetLabels, List<AnnotationButton> targetButtonList) {
         // CASE #1: Button's span is within the same line
         if (labels.size() == 1) {
             LineNumberedLabel label = labels.get(0);
-            AnnotationButton newButton = createButton(annotation, label, begin, end);
+            AnnotationButton newButton = createButton(annotation, label, targetLabels, begin, end);
 
-            if (previousButton != null) {
-                newButton.previousButton = previousButton;
-                previousButton.nextButton = newButton;
-            }
-
-            previousButton = newButton;
-            taskButtons.add(newButton);
+            targetButtonList.add(newButton);
         } else {
             // CASE #2: This button spans at least 2 lines
             List<AnnotationButton> buttons = new ArrayList<>();
 
             labels.forEach(label -> {
                 double charWidth = label.getTextLabel().getWidth() / label.getLineText().length();
-                double topAnchor = characterHeight * taskLabels.indexOf(label) * 2.0d;
+                double topAnchor = characterHeight * targetLabels.indexOf(label) * 2.0d;
 
                 AnnotationButton newButton;
 
@@ -164,17 +189,8 @@ public class CreateButtonsTask extends Task<List<AnnotationButton>> {
                 }
             });
 
-            if (previousButton != null) {
-                buttons.forEach(button -> button.previousButton = previousButton);
-                previousButton.nextButton = buttons.get(0);
-                previousButton.sameAnnotationButtons.forEach(button -> button.nextButton = buttons.get(0));
-            }
-
-            previousButton = buttons.get(0);
-            taskButtons.addAll(buttons);
+            targetButtonList.addAll(buttons);
         }
-
-        updateValue(taskButtons);
     }
 
     /**
@@ -185,10 +201,10 @@ public class CreateButtonsTask extends Task<List<AnnotationButton>> {
      * @param end           The end position of the annotation's text
      * @return              Returns an AnnotationButton appropriately formatted and offset on top of its text
      */
-    private AnnotationButton createButton(JsonObject annotation, LineNumberedLabel label, int begin, int end) {
+    private AnnotationButton createButton(JsonObject annotation, LineNumberedLabel label, List<LineNumberedLabel> targetLabels, int begin, int end) {
         double characterWidth = label.getTextLabel().getWidth() / label.getLineText().length();
         double size = characterWidth * (end - begin);
-        double topAnchor = characterHeight * taskLabels.indexOf(label) * 2.0d;
+        double topAnchor = characterHeight * targetLabels.indexOf(label) * 2.0d;
         double leftAnchor = characterWidth * (begin - label.getTextOffset());
 
         return createButton(annotation, size, leftAnchor, topAnchor);
@@ -202,5 +218,53 @@ public class CreateButtonsTask extends Task<List<AnnotationButton>> {
         AnchorPane.setLeftAnchor(button, leftAnchor + AnnotatedDocumentPane.LINE_NUMBER_WIDTH);
 
         return button;
+    }
+
+    /**
+     * Assign all the "previous" and "next" values for each of the buttons.  The loop goes through every button except
+     * the last one, and finds the next button whose "start" value is greater than its own.
+     *
+     * There is a running "previous" button assigned to the latest used; this is assigned to the last button on the list's
+     * "previous" value if their "start" values differ; otherwise, the last button's "previous" value is this running button's
+     * "previous" value as well.
+     */
+
+    private static final Logger logger = LogManager.getLogger();
+    private void setPreviousAndNextValues() {
+        List<AnnotationButton> masterList = new ArrayList<>();
+        masterList.addAll(results.get(CorpusType.SYSTEM));
+        masterList.addAll(results.get(CorpusType.REFERENCE));
+
+        Collections.sort(masterList);
+        AnnotationButton previous = null;
+        for (int i = 0; i < masterList.size() - 1; i++) {
+            previous = masterList.get(i);
+
+            // Start this loop at the index immediately following i; break out of this loop as soon as a "next" is found
+            for (int j = i + 1; j < masterList.size(); j++) {
+                AnnotationButton next = masterList.get(j);
+                if (next.getBegin() > previous.getBegin()) {
+                    previous.nextButton = next;
+
+                    if (next.previousButton == null) {
+                        next.previousButton = previous;
+                        for (AnnotationButton sameButton : next.sameAnnotationButtons) {
+                            sameButton.previousButton = previous;
+                        }
+                    }
+
+                    break;
+                }
+            }
+        }
+
+        AnnotationButton last = masterList.get(masterList.size() - 1);
+        if (previous != null) {
+            if (last.getBegin() == previous.getBegin()) {
+                last.previousButton = previous.previousButton;
+            } else {
+                last.previousButton = previous;
+            }
+        }
     }
 }
