@@ -352,11 +352,6 @@ public class AcvContentController implements Initializable {
         int beginRef = refButton.getBegin();
         int endRef = refButton.getEnd();
 
-        if (beginSysOut == beginRef && endSysOut == endRef) {
-            systemOutButton.matchingButtons.add(refButton);
-            refButton.matchingButtons.add(systemOutButton);
-        }
-
         switch (matchType) {
             case "partial":
                 /*
@@ -375,11 +370,16 @@ public class AcvContentController implements Initializable {
                  * |----------|  |------|
                  *   |--------|    |--|
                  */
-                if (beginRef >= beginSysOut && endRef <= endSysOut) {
+                if (beginRef > beginSysOut && endRef <= endSysOut || beginRef >= beginSysOut && endRef < endSysOut) {
                     systemOutButton.matchingButtons.add(refButton);
                     refButton.matchingButtons.add(systemOutButton);
                 }
                 break;
+        }
+        
+        if (beginSysOut == beginRef && endSysOut == endRef) {
+            systemOutButton.matchingButtons.add(refButton);
+            refButton.matchingButtons.add(systemOutButton);
         }
     }
 
