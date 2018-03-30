@@ -12,7 +12,7 @@
       fx:controller="com.clinacuity.acv.controllers.NavBarController" styleClass="header">
     <HBox alignment="TOP_RIGHT">
         <HBox>
-            <ImageView fitHeight="32" preserveRatio="true" onMouseEntered="#mouseEnteredLogo"
+            <ImageView fitHeight="24" preserveRatio="true" onMouseEntered="#mouseEnteredLogo"
                        onMouseExited="#mouseExitedLogo" onMouseClicked="#clickedLogo" pickOnBounds="true">
                 <Image url="/img/clinacuity/clinacuity_logo.png"/>
             </ImageView>
@@ -23,7 +23,7 @@
     </HBox>
     <HBox pickOnBounds="false">
         <HBox>
-            <ImageView fitHeight="48" preserveRatio="true">
+            <ImageView fitHeight="32" preserveRatio="true">
                 <Image url="/img/clinacuity/etude_logo.png"/>
             </ImageView>
             <padding>
