@@ -9,11 +9,21 @@
 
 <StackPane xmlns="http://javafx.com/javafx"
       xmlns:fx="http://javafx.com/fxml"
-      fx:controller="com.clinacuity.acv.controllers.NavBarController" styleClass="header"
-      maxWidth="Infinity">
-    <HBox>
+      fx:controller="com.clinacuity.acv.controllers.NavBarController" styleClass="header">
+    <HBox alignment="TOP_RIGHT">
         <HBox>
-            <ImageView fitHeight="48" preserveRatio="true" pickOnBounds="true">
+            <ImageView fitHeight="32" preserveRatio="true" onMouseEntered="#mouseEnteredLogo"
+                       onMouseExited="#mouseExitedLogo" onMouseClicked="#clickedLogo" pickOnBounds="true">
+                <Image url="/img/clinacuity/clinacuity_logo.png"/>
+            </ImageView>
+            <padding>
+                <Insets topRightBottomLeft="5"/>
+            </padding>
+        </HBox>
+    </HBox>
+    <HBox pickOnBounds="false">
+        <HBox>
+            <ImageView fitHeight="48" preserveRatio="true">
                 <Image url="/img/clinacuity/etude_logo.png"/>
             </ImageView>
             <padding>
@@ -28,17 +38,6 @@
             <NavBarButton fx:id="compareViewerButton" text="View"/>
             <padding>
                 <Insets left="25"/>
-            </padding>
-        </HBox>
-    </HBox>
-    <HBox alignment="TOP_RIGHT">
-        <HBox>
-            <ImageView fitHeight="32" preserveRatio="true" pickOnBounds="true" onMouseEntered="#mouseEnteredLogo"
-                       onMouseExited="#mouseExitedLogo" onMouseClicked="#clickedLogo">
-                <Image url="/img/clinacuity/clinacuity_logo.png"/>
-            </ImageView>
-            <padding>
-                <Insets topRightBottomLeft="5"/>
             </padding>
         </HBox>
     </HBox>
