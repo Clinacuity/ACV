@@ -29,7 +29,7 @@
                     <Insets topRightBottomLeft="15"/>
                 </padding>
                 <VBox spacing="10">
-                    <Label text="View Analysis" styleClass="text-header-one, underlined"/>
+                    <Label text="View Analysis" styleClass="text-header-one"/>
                     <VBox spacing="10">
                         <HBox spacing="10">
                             <JFXHamburger maxHeight="Infinity" onMouseClicked="#collapsePanel">

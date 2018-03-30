@@ -134,12 +134,6 @@
     -fx-effect: dropshadow(gaussian, rgba(100, 100, 100, 0.25), 0, 1, 0, 1);
 }
 
-.underlined {
-    -fx-border-color: SlateGray;
-    -fx-border-insets: 0 -35 0 0;
-    -fx-border-width: 0 0 1 0;
-    -fx-effect: dropshadow(gaussian, rgba(120, 120, 120, 0.25), 10, 0.75, 0, 0);
-}
 /*    MISC        */
 
 /*    BUTTONS     */
@@ -265,13 +259,13 @@
 }
 
 .text-header-one {
-    -fx-font-family: "Open Sans Bold Italic";
+    -fx-font-family: "Open Sans Italic";
     -fx-font-size: 24;
     -fx-text-fill: rgb(0, 56, 145);
 }
 
 .text-header-two {
-    -fx-font-family: "Open Sans Bold Italic";
+    -fx-font-family: "Open Sans Bold";
     -fx-font-size: 16;
     -fx-text-fill: CornflowerBlue;
 }
