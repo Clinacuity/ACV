@@ -26,7 +26,7 @@
         <padding>
             <Insets topRightBottomLeft="15"/>
         </padding>
-        <Label text="Configuration Builder" styleClass="text-header-one, underlined"/>
+        <Label text="Configuration Builder" styleClass="text-header-one"/>
         <HBox spacing="10" alignment="TOP_CENTER" maxHeight="Infinity">
             <VBox spacing="10" alignment="TOP_CENTER">
                 <Label text="System Output Types" styleClass="text-medium-normal"/>
