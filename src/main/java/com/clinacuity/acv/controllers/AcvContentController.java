@@ -9,8 +9,8 @@ import com.clinacuity.acv.controls.AnnotationType;
 import com.clinacuity.acv.controls.SideBar;
 import com.clinacuity.acv.controls.ViewControls;
 import com.clinacuity.acv.tasks.CreateButtonsTask;
-import com.clinacuity.acv.tasks.CreateLabelsFromDocumentTask;
 import com.clinacuity.acv.controls.AnnotationButton.MatchType;
+import com.clinacuity.acv.tasks.CreateLabelsTask;
 import com.clinacuity.acv.tasks.CreateSidebarItemsTask;
 import com.google.gson.JsonObject;
 import com.jfoenix.controls.JFXDrawer;
@@ -47,8 +47,7 @@ public class AcvContentController implements Initializable {
     private Annotations systemOutAnnotations;
     private Annotations referenceAnnotations;
     private ObjectProperty<AnnotationButton> selectedAnnotationButton = new SimpleObjectProperty<>();
-    private CreateLabelsFromDocumentTask referenceLabelsTask;
-    private CreateLabelsFromDocumentTask systemOutLabelsTask;
+    private CreateLabelsTask createLabelsTask;
     private CreateButtonsTask createButtonsTask;
 
     // TODO: no ticket but we should get rid of this var
@@ -62,9 +61,9 @@ public class AcvContentController implements Initializable {
     }
 
     private void init() {
-        initSideBar();
-
         initDocumentPanes();
+
+        initSideBar();
 
         initViewControls();
 
@@ -216,19 +215,18 @@ public class AcvContentController implements Initializable {
 
             context.annotationList.setValue(FXCollections.observableArrayList(list));
 
-            referenceLabelsTask = new CreateLabelsFromDocumentTask(referenceAnnotations.getRawText());
-            referenceLabelsTask.setOnSucceeded(event -> {
-                referencePane.addLineNumberedLabels(referenceLabelsTask.getValue());
+            createLabelsTask = new CreateLabelsTask(systemOutAnnotations.getRawText(), referenceAnnotations.getRawText());
+            createLabelsTask.setOnSucceeded(event -> {
+                systemOutPane.addLineNumberedLabels(createLabelsTask.getValue().get(CorpusType.SYSTEM));
+                referencePane.addLineNumberedLabels(createLabelsTask.getValue().get(CorpusType.REFERENCE));
                 resetViewControls();
             });
-            new Thread(referenceLabelsTask).start();
-
-            systemOutLabelsTask = new CreateLabelsFromDocumentTask(systemOutAnnotations.getRawText());
-            systemOutLabelsTask.setOnSucceeded(event -> {
-                systemOutPane.addLineNumberedLabels(systemOutLabelsTask.getValue());
-                resetViewControls();
+            createLabelsTask.setOnFailed(event -> {
+                systemOutPane.addLineNumberedLabels(null);
+                referencePane.addLineNumberedLabels(null);
+                logger.throwing(createLabelsTask.getException());
             });
-            new Thread(systemOutLabelsTask).start();
+            new Thread(createLabelsTask).start();
         }
     }
 
@@ -242,13 +240,9 @@ public class AcvContentController implements Initializable {
     }
 
     synchronized private void resetViewControls() {
-        documentsLoaded++;
-        if (documentsLoaded >= 2) {
-            documentsLoaded = 0;
-            createTableRows();
-            setViewControlsListeners();
-            viewControls.getAnnotationTable().getSelectionModel().clearSelection();
-        }
+        createTableRows();
+        setViewControlsListeners();
+        viewControls.getAnnotationTable().getSelectionModel().clearSelection();
     }
 
     private void removeViewControlsListeners() {
@@ -385,13 +379,13 @@ public class AcvContentController implements Initializable {
 
     private void removeUncheckedAnnotations() {
         systemOutPane.getAnnotationButtonList().forEach(button -> {
-            if (!isMatchTypeChecked(button.getMatchType())) {
+            if (isMatchTypeChecked(button.getMatchType())) {
                 button.removeFromParent();
             }
         });
 
         referencePane.getAnnotationButtonList().forEach(button -> {
-            if (!isMatchTypeChecked(button.getMatchType())) {
+            if (isMatchTypeChecked(button.getMatchType())) {
                 button.removeFromParent();
             }
         });
@@ -400,22 +394,18 @@ public class AcvContentController implements Initializable {
     private boolean isMatchTypeChecked(AnnotationButton.MatchType matchType) {
         switch (matchType) {
             case TRUE_POS:
-                return context.truePositivesProperty.getValue();
+                return !context.truePositivesProperty.getValue();
             case FALSE_POS:
-                return context.falsePositivesProperty.getValue();
+                return !context.falsePositivesProperty.getValue();
             case FALSE_NEG:
-                return context.falseNegativesProperty.getValue();
+                return !context.falseNegativesProperty.getValue();
         }
-        return false;
+        return true;
     }
 
     private void cancelEvents() {
-        if (systemOutLabelsTask != null && systemOutLabelsTask.isRunning()) {
-            systemOutLabelsTask.cancel();
-        }
-
-        if (referenceLabelsTask != null && referenceLabelsTask.isRunning()) {
-            referenceLabelsTask.cancel();
+        if (createLabelsTask != null && createLabelsTask.isRunning()) {
+            createLabelsTask.cancel();
         }
 
         if (createButtonsTask != null && createButtonsTask.isRunning()) {

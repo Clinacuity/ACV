@@ -6,9 +6,6 @@ import com.clinacuity.acv.controls.LineNumberedLabel;
 import com.google.gson.JsonObject;
 import javafx.concurrent.Task;
 import javafx.scene.layout.AnchorPane;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
-
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -21,8 +18,8 @@ public class CreateButtonsTask extends Task<Map<CorpusType, List<AnnotationButto
     private List<JsonObject> refAnnotations;
     private List<LineNumberedLabel> systemLabels;
     private List<LineNumberedLabel> refLabels;
-    private Map<CorpusType, List<AnnotationButton>> results = new HashMap<>();
-    private double characterHeight = -1.0;
+    private Map<CorpusType, List<AnnotationButton>> results;
+    private final double characterHeight;
 
     public CreateButtonsTask(List<JsonObject> systemAnnotations, List<LineNumberedLabel> systemLabels,
                           List<JsonObject> refAnnotations, List<LineNumberedLabel> refLabels) {
@@ -32,7 +29,7 @@ public class CreateButtonsTask extends Task<Map<CorpusType, List<AnnotationButto
         this.systemLabels = systemLabels;
         this.refAnnotations = refAnnotations;
         this.refLabels = refLabels;
-        this.characterHeight = AnnotatedDocumentPane.getCharacterHeight();
+        this.characterHeight = AnnotatedDocumentPane.CHARACTER_HEIGHT;
 
         results = new HashMap<>();
         results.put(CorpusType.REFERENCE, new ArrayList<>());
@@ -229,7 +226,6 @@ public class CreateButtonsTask extends Task<Map<CorpusType, List<AnnotationButto
      * "previous" value as well.
      */
 
-    private static final Logger logger = LogManager.getLogger();
     private void setPreviousAndNextValues() {
         List<AnnotationButton> masterList = new ArrayList<>();
         masterList.addAll(results.get(CorpusType.SYSTEM));
