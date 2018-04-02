@@ -1,11 +1,15 @@
 package com.clinacuity.acv.tasks;
 
+import com.clinacuity.acv.context.AcvContext;
 import com.clinacuity.acv.controls.AnnotatedDocumentPane;
 import com.clinacuity.acv.controls.AnnotationButton;
 import com.clinacuity.acv.controls.LineNumberedLabel;
 import com.google.gson.JsonObject;
+import javafx.beans.property.ObjectProperty;
 import javafx.concurrent.Task;
 import javafx.scene.layout.AnchorPane;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -14,12 +18,25 @@ import java.util.Map;
 import static com.clinacuity.acv.controllers.ConfigurationBuilderController.CorpusType;
 
 public class CreateButtonsTask extends Task<Map<CorpusType, List<AnnotationButton>>> {
+    private static final Logger logger = LogManager.getLogger();
+
     private List<JsonObject> systemAnnotations;
     private List<JsonObject> refAnnotations;
     private List<LineNumberedLabel> systemLabels;
     private List<LineNumberedLabel> refLabels;
     private Map<CorpusType, List<AnnotationButton>> results;
     private final double characterHeight;
+
+    private AnnotatedDocumentPane systemOutPane;
+    public void setSystemOutPane(AnnotatedDocumentPane pane) { systemOutPane = pane; }
+
+    private AnnotatedDocumentPane referencePane;
+    public void setReferencePane(AnnotatedDocumentPane pane) { referencePane = pane; }
+
+    private ObjectProperty<AnnotationButton> selectedAnnotationButton;
+    public void setSelectedAnnotationButton(ObjectProperty<AnnotationButton> button) {
+        selectedAnnotationButton = button;
+    }
 
     public CreateButtonsTask(List<JsonObject> systemAnnotations, List<LineNumberedLabel> systemLabels,
                           List<JsonObject> refAnnotations, List<LineNumberedLabel> refLabels) {
@@ -59,6 +76,7 @@ public class CreateButtonsTask extends Task<Map<CorpusType, List<AnnotationButto
             Collections.sort(results.get(CorpusType.SYSTEM));
             Collections.sort(results.get(CorpusType.REFERENCE));
 
+            setupAnnotationButtons();
             setPreviousAndNextValues();
         }
 
@@ -217,6 +235,36 @@ public class CreateButtonsTask extends Task<Map<CorpusType, List<AnnotationButto
         return button;
     }
 
+    private void setupAnnotationButtons() {
+        // Link the buttons
+        String matchType = AcvContext.getInstance().selectedMatchTypeProperty.getValueSafe().toLowerCase();
+        for (AnnotationButton sysOutButton : results.get(CorpusType.SYSTEM)) {
+            for(AnnotationButton refButton: results.get(CorpusType.REFERENCE)) {
+                matchButtons(sysOutButton, refButton, matchType);
+            }
+
+            sysOutButton.textArea = systemOutPane.getFeatureTreeText();
+            sysOutButton.parent = systemOutPane.getAnchor();
+            sysOutButton.setOnMouseClicked(event -> selectedAnnotationButton.setValue(sysOutButton));
+            sysOutButton.checkMatchTypes(AnnotationButton.MatchType.FALSE_POS);
+        }
+
+        for (AnnotationButton refButton: results.get(CorpusType.REFERENCE)) {
+            refButton.parent = referencePane.getAnchor();
+            refButton.textArea = referencePane.getFeatureTreeText();
+            refButton.setOnMouseClicked(event -> selectedAnnotationButton.setValue(refButton));
+            refButton.checkMatchTypes(AnnotationButton.MatchType.FALSE_NEG);
+        }
+
+        /*
+         * This could be faster by using either of the loops above; but for the sake of separating the logic,
+         * we will use a separate for-loop.  The cost to performance is O(n).  This loop determines
+         * which color to assign the buttons based on the type of match.
+         */
+        results.get(CorpusType.SYSTEM).forEach(button -> button.checkMatchTypes(AnnotationButton.MatchType.FALSE_POS));
+        results.get(CorpusType.REFERENCE).forEach(button -> button.checkMatchTypes(AnnotationButton.MatchType.FALSE_NEG));
+    }
+
     /**
      * Assign all the "previous" and "next" values for each of the buttons.  The loop goes through every button except
      * the last one, and finds the next button whose "start" value is greater than its own.
@@ -225,7 +273,6 @@ public class CreateButtonsTask extends Task<Map<CorpusType, List<AnnotationButto
      * "previous" value if their "start" values differ; otherwise, the last button's "previous" value is this running button's
      * "previous" value as well.
      */
-
     private void setPreviousAndNextValues() {
         List<AnnotationButton> masterList = new ArrayList<>();
         masterList.addAll(results.get(CorpusType.SYSTEM));
@@ -239,7 +286,17 @@ public class CreateButtonsTask extends Task<Map<CorpusType, List<AnnotationButto
             // Start this loop at the index immediately following i; break out of this loop as soon as a "next" is found
             for (int j = i + 1; j < masterList.size(); j++) {
                 AnnotationButton next = masterList.get(j);
-                if (next.getBegin() > previous.getBegin()) {
+
+
+                if (next.getBegin() == 5 && next.getEnd() == 8) {
+                    logger.error("Prev: {}, {}", previous.getBegin(), previous.getEnd());
+                    logger.error("Next: {}, {}", next.getBegin(), next.getEnd());
+                }
+
+                // Link the buttons if next.begin > prev.being
+                // OR if (next.begin == prev.begin AND next.end > previous.end)
+                if (next.getBegin() > previous.getBegin() ||
+                        (next.getBegin() == previous.getBegin() && next.getEnd() > previous.getEnd())) {
                     previous.nextButton = next;
 
                     if (next.previousButton == null) {
@@ -256,11 +313,49 @@ public class CreateButtonsTask extends Task<Map<CorpusType, List<AnnotationButto
 
         AnnotationButton last = masterList.get(masterList.size() - 1);
         if (previous != null) {
-            if (last.getBegin() == previous.getBegin()) {
+            if (previous.matchingButtons.contains(last)) {
                 last.previousButton = previous.previousButton;
             } else {
                 last.previousButton = previous;
+                previous.nextButton = last;
             }
+        }
+    }
+
+    private static void matchButtons(AnnotationButton systemOutButton, AnnotationButton refButton, String matchType) {
+        int beginSysOut = systemOutButton.getBegin();
+        int endSysOut = systemOutButton.getEnd();
+        int beginRef = refButton.getBegin();
+        int endRef = refButton.getEnd();
+
+        switch (matchType) {
+            case "partial":
+                /*
+                 * Partial overlap:
+                 * |------|     |---------|  |---|
+                 *     |----------|  |--------|
+                 */
+                if ((beginSysOut > beginRef && beginSysOut < endRef) || beginRef > beginSysOut && beginRef < endSysOut) {
+                    systemOutButton.matchingButtons.add(refButton);
+                    refButton.matchingButtons.add(systemOutButton);
+                }
+                break;
+            case "fully-contained":
+                /*
+                 * Fully contained only considers when system contains reference
+                 * |----------|  |------|
+                 *   |--------|    |--|
+                 */
+                if (beginRef > beginSysOut && endRef <= endSysOut || beginRef >= beginSysOut && endRef < endSysOut) {
+                    systemOutButton.matchingButtons.add(refButton);
+                    refButton.matchingButtons.add(systemOutButton);
+                }
+                break;
+        }
+
+        if (beginSysOut == beginRef && endSysOut == endRef) {
+            systemOutButton.matchingButtons.add(refButton);
+            refButton.matchingButtons.add(systemOutButton);
         }
     }
 }

@@ -295,86 +295,18 @@ public class AcvContentController implements Initializable {
         createButtonsTask.setOnSucceeded(event -> {
             systemOutPane.addButtons(createButtonsTask.getValue().get(CorpusType.SYSTEM));
             referencePane.addButtons(createButtonsTask.getValue().get(CorpusType.REFERENCE));
-            setupAnnotationButtons();
+            removeUncheckedAnnotations();
         });
         createButtonsTask.setOnFailed(event -> {
             logger.throwing(createButtonsTask.getException());
             systemOutPane.addButtons(new ArrayList<>());
-            setupAnnotationButtons();
+            removeUncheckedAnnotations();
         });
+
+        createButtonsTask.setSelectedAnnotationButton(selectedAnnotationButton);
+        createButtonsTask.setSystemOutPane(systemOutPane);
+        createButtonsTask.setReferencePane(referencePane);
         new Thread(createButtonsTask).start();
-    }
-
-    synchronized private void setupAnnotationButtons() {
-        List<AnnotationButton> sysOutButtons = systemOutPane.getAnnotationButtonList();
-        List<AnnotationButton> refButtons = referencePane.getAnnotationButtonList();
-
-        // Link the buttons
-        String matchType = AcvContext.getInstance().selectedMatchTypeProperty.getValueSafe().toLowerCase();
-        for (AnnotationButton sysOutButton : sysOutButtons) {
-            for(AnnotationButton refButton: refButtons) {
-                matchButtons(sysOutButton, refButton, matchType);
-            }
-
-            sysOutButton.textArea = systemOutPane.getFeatureTreeText();
-            sysOutButton.parent = systemOutPane.getAnchor();
-            sysOutButton.setOnMouseClicked(event -> selectedAnnotationButton.setValue(sysOutButton));
-            sysOutButton.checkMatchTypes(MatchType.FALSE_POS);
-        }
-
-        for (AnnotationButton refButton: refButtons) {
-            refButton.parent = referencePane.getAnchor();
-            refButton.textArea = referencePane.getFeatureTreeText();
-            refButton.setOnMouseClicked(event -> selectedAnnotationButton.setValue(refButton));
-            refButton.checkMatchTypes(MatchType.FALSE_NEG);
-        }
-
-            /*
-            * This could be faster by using either of the loops above; but for the sake of separating the logic,
-            * we will use a separate for-loop.  The cost to performance is O(n).  This loop determines
-            * which color to assign the buttons based on the type of match.
-            */
-        sysOutButtons.forEach(button -> button.checkMatchTypes(MatchType.FALSE_POS));
-        refButtons.forEach(button -> button.checkMatchTypes(MatchType.FALSE_NEG));
-
-        removeUncheckedAnnotations();
-    }
-
-    private void matchButtons(AnnotationButton systemOutButton, AnnotationButton refButton, String matchType) {
-        int beginSysOut = systemOutButton.getBegin();
-        int endSysOut = systemOutButton.getEnd();
-        int beginRef = refButton.getBegin();
-        int endRef = refButton.getEnd();
-
-        switch (matchType) {
-            case "partial":
-                /*
-                 * Partial overlap:
-                 * |------|     |---------|  |---|
-                 *     |----------|  |--------|
-                 */
-                if ((beginSysOut > beginRef && beginSysOut < endRef) || beginRef > beginSysOut && beginRef < endSysOut) {
-                    systemOutButton.matchingButtons.add(refButton);
-                    refButton.matchingButtons.add(systemOutButton);
-                }
-                break;
-            case "fully-contained":
-                /*
-                 * Fully contained only considers when system contains reference
-                 * |----------|  |------|
-                 *   |--------|    |--|
-                 */
-                if (beginRef > beginSysOut && endRef <= endSysOut || beginRef >= beginSysOut && endRef < endSysOut) {
-                    systemOutButton.matchingButtons.add(refButton);
-                    refButton.matchingButtons.add(systemOutButton);
-                }
-                break;
-        }
-        
-        if (beginSysOut == beginRef && endSysOut == endRef) {
-            systemOutButton.matchingButtons.add(refButton);
-            refButton.matchingButtons.add(systemOutButton);
-        }
     }
 
     private void removeUncheckedAnnotations() {
