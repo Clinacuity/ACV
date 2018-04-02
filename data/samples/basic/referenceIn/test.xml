@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<sample>
+<TEXT><![CDATA[This is a test
+file that has fake annotations.
+]]>
+</TEXT>
+<TAGS>
+<SAMPLE id="P1" start="0" end="5" text="This " TYPE="SAMPLE" comment=""/>
+<SAMPLE id="P2" start="5" end="8" text="is " TYPE="SAMPLE" comment=""/>
+<SAMPLE id="P3" start="8" end="10" text="a " TYPE="SAMPLE" comment=""/>
+<SAMPLE id="P4" start="15" end="19" text="file" TYPE="SAMPLE" comment=""/>
+<SAMPLE id="P5" start="34" end="45" text="annotations" TYPE="SAMPLE" comment=""/>
+</TAGS>
+</sample>
