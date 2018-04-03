@@ -193,7 +193,13 @@ public class AnnotationButton extends Button implements Comparable<AnnotationBut
      *                              from being compared to this object.
      */
     @Override
-    public int compareTo(AnnotationButton o) { return Integer.compare(begin, o.begin); }
+    public int compareTo(AnnotationButton o) {
+        int value = Integer.compare(begin, o.begin);
+        if (value == 0) {
+            return Integer.compare(end, o.end);
+        }
+        return value;
+    }
 
     /* ******************************
      *                              *
