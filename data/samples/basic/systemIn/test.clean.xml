@@ -9,7 +9,6 @@
     <type2:MachineLearningAnnotation xmi:id="5" sofa="2" begin="33" end="45" derivedPHItype="Sample"/>
     <type2:MachineLearningAnnotation xmi:id="6" sofa="2" begin="48" end="54" derivedPHItype="Sample"/>
     <type2:MachineLearningAnnotation xmi:id="7" sofa="2" begin="60" end="69" derivedPHItype="Sample"/>
-    <type2:MachineLearningAnnotation xmi:id="7" sofa="2" begin="60" end="69" derivedPHItype="Sample"/>
     <type2:MachineLearningAnnotation xmi:id="7" sofa="2" begin="74" end="90" derivedPHItype="Sample"/>
     <cas:Sofa xmi:id="2" sofaNum="1" sofaID="_InitialView" mimeType="text" sofaString="This is a test&#10;file that has fake annotations.&#10;&#10;Here's some more data for partial matching."/>
     <cas:View sofa="2" members="1 2 3 4 5 6 7"/>
