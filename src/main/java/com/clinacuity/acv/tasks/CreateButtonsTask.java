@@ -333,9 +333,9 @@ public class CreateButtonsTask extends Task<Map<CorpusType, List<AnnotationButto
                 /*
                  * Partial overlap:
                  * |------|     |---------|  |---|
-                 *     |----------|  |--------|
+                 *     |----------|  |----|  |------|
                  */
-                if ((beginSysOut > beginRef && beginSysOut < endRef) || beginRef > beginSysOut && beginRef < endSysOut) {
+                if ((beginSysOut >= beginRef && beginSysOut < endRef) || beginRef > beginSysOut && beginRef <= endSysOut) {
                     systemOutButton.matchingButtons.add(refButton);
                     refButton.matchingButtons.add(systemOutButton);
                 }
